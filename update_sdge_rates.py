@@ -6,151 +6,126 @@ import re
 from datetime import datetime
 
 # --- CONFIGURATION ---
-# SDG&E lists their "All-In" summaries on these primary landing pages
-ELECTRIC_SUMMARY_URL = "https://www.sdge.com/residential/pricing-plans/time-of-use-pricing-plans"
-GAS_SUMMARY_URL = "https://www.sdge.com/residential/pricing-plans/gas-pricing-plans"
+# Primary URL for all residential electric plans
+ELECTRIC_URL = "https://www.sdge.com/residential/pricing-plans"
+# Gas procurement is often updated monthly on a sibling page
+GAS_URL = "https://www.sdge.com/residential/pricing-plans/gas-pricing-plans"
 
-HEADERS = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'}
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept-Language': 'en-US,en;q=0.9'
+}
 
-# Mapping our App Plan IDs to the text markers on SDG&E's site
-PLAN_MARKERS = {
+# Plan ID mapping to site headers
+PLAN_MAP = {
     "TOU-DR1": "TOU-DR1",
     "TOU-DR2": "TOU-DR2",
+    "Standard DR": "Standard DR",
+    "EV-TOU-5": "EV-TOU-5",
     "TOU-ELEC": "TOU-ELEC",
     "DR-SES": "DR-SES",
-    "EV-TOU-5": "EV-TOU-5",
-    "EV-TOU-5-P": "EV-TOU-5-P",
     "TOU-DR-P": "TOU-DR-P",
-    "Standard DR": "Standard",
+    "EV-TOU-5-P": "EV-TOU-5-P",
     "EV-TOU": "EV-TOU"
 }
 
-def extract_decimal(text):
-    """Finds the first decimal rate in a string (e.g. '$0.54123' -> 0.54123)"""
-    match = re.search(r"(\d+\.\d+)", text.replace('$', ''))
-    return float(match.group(1)) if match else None
-
-def scrape_sdge_electric():
-    print("--- Scraping SDG&E Electric Rates ---")
-    results = {}
-    try:
-        resp = requests.get(ELECTRIC_SUMMARY_URL, headers=HEADERS, timeout=15)
-        soup = BeautifulSoup(resp.text, 'html.parser')
-        
-        # SDG&E organizes plans in 'cards' or 'tables'
-        # We look for the plan name and then find the rates in the immediate vicinity
-        for app_id, marker in PLAN_MARKERS.items():
-            plan_block = soup.find(string=re.compile(marker, re.IGNORECASE))
-            if plan_block:
-                # Find the next table or list containing rates
-                container = plan_block.find_parent(['div', 'section'])
-                rates = []
-                if container:
-                    for text in container.find_all(string=re.compile(r"\d+\.\d+")):
-                        val = extract_decimal(text)
-                        if val and 0.10 < val < 1.0: # Valid range for SDGE kWh
-                            rates.append(val)
-                
-                if len(rates) >= 2:
-                    # SDGE usually lists On-Peak then Off-Peak
-                    # We broadcast these to our JSON structure
-                    results[app_id] = {
-                        "on": rates[0],
-                        "off": rates[1],
-                        "super": rates[2] if len(rates) > 2 else rates[1]
-                    }
-                    print(f"  [Found] {app_id}: {results[app_id]}")
-                    
-    except Exception as e:
-        print(f"Electric Scrape Error: {e}")
-    return results
-
-def scrape_sdge_gas():
-    print("--- Scraping SDG&E Gas Rates ---")
-    gas_data = {}
-    try:
-        resp = requests.get(GAS_SUMMARY_URL, headers=HEADERS, timeout=15)
-        soup = BeautifulSoup(resp.text, 'html.parser')
-        
-        # 1. Procurement (Commodity)
-        proc_match = soup.find(string=re.compile(r"Core Procurement", re.IGNORECASE))
-        if proc_match:
-            # Look for the price in the next <td> or <span>
-            price_row = proc_match.find_parent('tr')
-            val = extract_decimal(price_row.get_text()) if price_row else None
-            if val:
-                # SDGE often lists cents (45.123); convert to dollars
-                gas_data["procurement"] = round(val / 100, 5) if val > 1.0 else val
-                print(f"  [Found] Gas Procurement: ${gas_data['procurement']}")
-
-        # 2. Transportation (Delivery)
-        trans_match = soup.find(string=re.compile(r"Transportation", re.IGNORECASE))
-        if trans_match:
-            rates = []
-            price_table = trans_match.find_parent('table')
-            if price_table:
-                for row in price_table.find_all('tr'):
-                    val = extract_decimal(row.get_text())
-                    if val and val > 0.5: # Delivery is usually $1.00+
-                        rates.append(val)
-            
-            if len(rates) >= 2:
-                gas_data["tier1"] = rates[0]
-                gas_data["tier2"] = rates[1]
-                print(f"  [Found] Gas Tiers: {rates[0]}, {rates[1]}")
-
-    except Exception as e:
-        print(f"Gas Scrape Error: {e}")
-    return gas_data
+def extract_cents(text):
+    """Converts '34.0¢' or '$0.34' to 0.34 float."""
+    match = re.search(r"(\d+\.\d+)", text)
+    if match:
+        val = float(match.group(1))
+        # If it contains the cent symbol or is a whole number > 1, assume cents
+        if '¢' in text or val > 1.0:
+            return round(val / 100, 5)
+        return val
+    return None
 
 def main():
     dry_run = "--dry-run" in sys.argv
+    print(f"--- Starting SDG&E Scrape (Dry Run: {dry_run}) ---")
+
     try:
         with open('sdge_rates.json', 'r') as f:
             data = json.load(f)
-    except:
-        print("Creating new sdge_rates.json structure...")
-        data = {"lastUpdated": "", "nbcRate": 0.0245, "baselineCredit": 0.0872, "minimumBillDaily": 0.384, "sbpExportRate": 0.062, "plans": {}, "gas": {}}
+    except Exception as e:
+        print(f"Error loading JSON: {e}")
+        sys.exit(1)
 
-    elec_rates = scrape_sdge_electric()
-    gas_rates = scrape_sdge_gas()
+    # 1. FETCH ELECTRIC DATA
+    # Note: On GitHub Actions, we recommend using Playwright if this static fetch fails.
+    # For now, we search the text for the 2026 effective blocks.
+    resp = requests.get(ELECTRIC_URL, headers=HEADERS, timeout=15)
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    page_text = soup.get_text(separator=' ')
 
     updated = False
     now = datetime.now()
+    # SDGE Summer: June 1 - Oct 31
     is_summer = (6 <= now.month <= 10)
     season_key = "summer" if is_summer else "winter"
 
-    # Apply Electric
-    for plan_id, rates in elec_rates.items():
-        if plan_id not in data["plans"]: continue
+    # Search the text for each plan block
+    # We look for the section starting with 'Non-CCA Customers' for Total Rates
+    for app_id, marker in PLAN_MAP.items():
+        # Find the text block for the specific plan
+        pattern = rf"{marker}.*?Non-CCA Customers: Electric Generation and Delivery"
+        section = re.search(pattern, page_text, re.IGNORECASE | re.DOTALL)
         
-        target = data["plans"][plan_id][season_key]
-        if target["onPeak"] != rates["on"]:
-            target["onPeak"] = rates["on"]
-            target["offPeak"] = rates["off"]
-            target["superOffPeak"] = rates["super"]
-            updated = True
-
-    # Apply Gas
-    if "procurement" in gas_rates and data["gas"]["procurement"] != gas_rates["procurement"]:
-        data["gas"]["procurement"] = gas_rates["procurement"]
-        updated = True
-    
-    if "tier1" in gas_rates:
-        data["gas"]["transportation"]["tier1"] = gas_rates["tier1"]
-        data["gas"]["transportation"]["tier2"] = gas_rates["tier2"]
-        updated = True
-
-    if updated:
-        if dry_run:
-            print("\n>>> DRY RUN: Changes detected but not saved.")
+        if section:
+            # Look for rates in proximity to tiers
+            # Pattern: 'Tier 1' followed by 1-3 rate values
+            rates_text = page_text[section.end():section.end()+500]
+            found_rates = []
+            
+            # Find all strings ending in ¢
+            for match in re.findall(r"(\d+\.\d+¢)", rates_text):
+                found_rates.append(extract_cents(match))
+            
+            if len(found_rates) >= 2:
+                # Map to JSON: Usually Super-Off, Off, On
+                # If only 2 found (like DR2), map appropriately
+                on = found_rates[-1] # Usually the highest/last
+                off = found_rates[0]
+                sup = found_rates[0] if len(found_rates) < 3 else found_rates[0]
+                
+                # Update data object
+                if app_id in data["plans"]:
+                    target = data["plans"][app_id][season_key]
+                    if target["onPeak"] != on:
+                        print(f"  [CHANGE] {app_id} {season_key} On-Peak: {target['onPeak']} -> {on}")
+                        target["onPeak"] = on
+                        target["offPeak"] = off
+                        target["superOffPeak"] = sup
+                        updated = True
         else:
-            data["lastUpdated"] = now.strftime("%Y-%m-%d %H:%M")
-            with open('sdge_rates.json', 'w') as f:
-                json.dump(data, f, indent=2)
-            print("\n>>> SUCCESS: sdge_rates.json updated.")
+            print(f"  [Warning] Could not locate 'Generation and Delivery' block for {app_id}")
+
+    # 2. FETCH GAS DATA (Simplified proxy)
+    # Using sibling Sempra data (SoCalGas) for procurement as they update simultaneously
+    gas_resp = requests.get("https://www.socalgas.com/business/energy-market-services/gas-prices", headers=HEADERS)
+    if gas_resp.status_code == 200:
+        # Match current month/year procurement rate
+        month_full = now.strftime("%B")
+        gas_pattern = rf"{month_full}\s+\d{{1,2}},\s+{now.year}\s+(\d+\.\d{{3,5}})"
+        gas_match = re.search(gas_pattern, gas_resp.text)
+        if gas_match:
+            proc_cents = float(gas_match.group(1))
+            proc_dollars = round(proc_cents / 100, 5)
+            if data["gas"]["procurement"] != proc_dollars:
+                print(f"  [CHANGE] Gas Procurement: {data['gas']['procurement']} -> {proc_dollars}")
+                data["gas"]["procurement"] = proc_dollars
+                updated = True
+
+    # 3. SAVE
+    if updated and not dry_run:
+        data["lastUpdated"] = now.strftime("%Y-%m-%d %H:%M")
+        with open('sdge_rates.json', 'w') as f:
+            json.dump(data, f, indent=2)
+        print(">>> SUCCESS: sdge_rates.json updated.")
+    elif updated:
+        print(">>> DRY RUN: Changes detected but not saved.")
     else:
-        print("\n>>> No changes needed.")
+        print(">>> No changes detected.")
 
 if __name__ == "__main__":
     main()

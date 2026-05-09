@@ -1,7 +1,7 @@
 name: SDG&E Auto Update
 on:
   schedule:
-    - cron: '0 12 1 * *' # 12:00 UTC on the 1st of every month
+    - cron: '0 12 1 * *' 
   workflow_dispatch: 
     inputs:
       dry_run:
@@ -21,7 +21,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install Dependencies
-        run: pip install requests beautifulsoup4
+        run: |
+          pip install playwright
+          playwright install chromium
       - name: Run Scraper
         run: python update_sdge_rates.py ${{ github.event.inputs.dry_run == 'true' && '--dry-run' || '' }}
       - name: Commit and Push
@@ -30,5 +32,5 @@ jobs:
           git config --global user.name 'SDGE-Bot'
           git config --global user.email 'bot@utilityestimator.com'
           git add sdge_rates.json
-          git commit -m "SDG&E rate update: $(date)" || exit 0
+          git commit -m "SDG&E auto-sync: $(date)" || exit 0
           git push

@@ -1,4 +1,4 @@
-name: SDG&E Auto Update
+name: SDG&E Rate Update
 on:
   schedule:
     - cron: '0 12 1 * *' 
@@ -9,6 +9,10 @@ on:
         required: true
         type: boolean
         default: false
+  # Trigger when a PDF is committed to the uploads folder
+  push:
+    paths:
+      - 'sdge_uploads/**.pdf'
 
 jobs:
   build:
@@ -23,11 +27,15 @@ jobs:
           python-version: '3.11'
 
       - name: Install Dependencies
-        # We need these two libraries for the new static scraper
-        run: pip install requests beautifulsoup4
+        run: pip install requests beautifulsoup4 pdfplumber
 
-      - name: Run Scraper
+      - name: Run Automated Scraper
+        # This keeps the dates fresh if no PDF is uploaded
         run: python update_sdge_rates.py ${{ github.event.inputs.dry_run == 'true' && '--dry-run' || '' }}
+
+      - name: Run Manual PDF Parser
+        # This overwrites web data with the high-precision PDF data
+        run: python parse-sdge-manual.py
 
       - name: Commit and Push
         if: github.event.inputs.dry_run != 'true'

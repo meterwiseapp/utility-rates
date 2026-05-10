@@ -17,15 +17,6 @@ def extract_decimal(text):
     match = re.search(r"(-?\d+\.\d{3,6})", clean)
     return float(match.group(1)) if match else 0.0
 
-def get_best_decimal_from_row(row):
-    """Finds the 'Total Rate' by looking for the last valid decimal in the row, ignoring dashes."""
-    for cell in reversed(row):
-        val = extract_decimal(str(cell))
-        # Rates are decimals (0.05 to 0.95) or service charges (0.10 to 0.90)
-        if 0.01 < val < 2.0:
-            return val
-    return 0.0
-
 def parse_sdge_pdf(pdf_path):
     print(f"\n[Analyzing PDF] {os.path.basename(pdf_path)}")
     
@@ -36,7 +27,7 @@ def parse_sdge_pdf(pdf_path):
         "winter": {"on": None, "mid": None, "off": None},
         "baseline_credit": None,
         "service_charge": None,
-        "service_charge_reduced": None  # Key for DRAH/FERA reduced daily rate
+        "service_charge_reduced": None 
     }
 
     with pdfplumber.open(pdf_path) as pdf:
@@ -48,64 +39,78 @@ def parse_sdge_pdf(pdf_path):
         if plan_match:
             results["plan_id"] = plan_match.group(1)
             if results["plan_id"] == "DR": results["is_tiered"] = True
-            print(f"  > Target: {results['plan_id']}")
+            print(f"  > Target Plan: {results['plan_id']}")
 
-        # 2. Hybrid Extraction
-        # We iterate through rows extracted as tables first, as they preserve cell order
-        table_data = page.extract_table()
+        # 2. Block-Aware Parsing
+        lines = full_text.split('\n')
         current_season = None
 
-        if table_data:
-            for row in table_data:
-                row = [str(c).strip() if c else "" for c in row]
-                row_str = " ".join(row)
+        for line in lines:
+            line_clean = line.strip()
+            if not line_clean: continue
 
-                # Update Season context
-                if "Summer" in row_str: current_season = "summer"
-                elif "Winter" in row_str: current_season = "winter"
+            # Track Season context
+            if "Summer" in line_clean: current_season = "summer"
+            elif "Winter" in line_clean: current_season = "winter"
 
-                if current_season:
-                    val = get_best_decimal_from_row(row)
-                    if val <= 0.01: continue
-
+            if current_season:
+                # Find all 5-decimal numbers on the line
+                # On SDGE sheets, the Totals are always at the very end of the list
+                decimals = re.findall(r"\d+\.\d{5}", line_clean)
+                
+                if decimals:
+                    # CASE A: Standard DR (Tiered) - Look for 2 tiers
                     if results["is_tiered"]:
-                        if "Tier 1" in row_str or "Up to" in row_str:
-                            results[current_season]["on"] = val
-                            print(f"    [Extracted] {current_season} Tier 1: {val}")
-                        elif "Tier 2" in row_str or "Above" in row_str:
+                        if "Tier 1" in line_clean or "Up to" in line_clean:
+                            results[current_season]["on"] = float(decimals[-1])
+                            print(f"    [Extracted] {current_season} Tier 1: {decimals[-1]}")
+                        elif "Tier 2" in line_clean or "Above" in line_clean:
+                            val = float(decimals[-1])
                             results[current_season]["mid"] = val
                             results[current_season]["off"] = val
                             print(f"    [Extracted] {current_season} Tier 2: {val}")
+                    
+                    # CASE B: TOU Plans - Look for 3-bin block
+                    # In your text dump, On, Off, and Super-Off totals appear together at the end
+                    elif "On-Peak" in line_clean and "Super Off-Peak" in line_clean:
+                        if len(decimals) >= 3:
+                            # Mapping based on your text dump order (On, Off, Super)
+                            results[current_season]["on"] = float(decimals[-3])
+                            results[current_season]["mid"] = float(decimals[-2])
+                            results[current_season]["off"] = float(decimals[-1])
+                            print(f"    [Extracted] {current_season} Block: On:{decimals[-3]} Mid:{decimals[-2]} Off:{decimals[-1]}")
+                    
+                    # CASE C: TOU Individual lines (fallback if not blocked)
+                    elif "On-Peak" in line_clean:
+                        results[current_season]["on"] = float(decimals[-1])
+                        print(f"    [Extracted] {current_season} On-Peak: {decimals[-1]}")
+                    elif "Super Off-Peak" in line_clean:
+                        results[current_season]["off"] = float(decimals[-1])
+                        print(f"    [Extracted] {current_season} Super Off-Peak: {decimals[-1]}")
+                    elif "Off-Peak" in line_clean:
+                        results[current_season]["mid"] = float(decimals[-1])
+                        print(f"    [Extracted] {current_season} Off-Peak: {decimals[-1]}")
+
+            # 3. FIXED CHARGE LOGIC (Updated for Reduced Rates)
+            if "Base Services Charge" in line_clean:
+                # Find the rate at the end of the line
+                decimals = re.findall(r"\d+\.\d{5}", line_clean)
+                if decimals:
+                    val = float(decimals[-1])
+                    if "DRAH" in line_clean or "FERA" in line_clean:
+                        results["service_charge_reduced"] = val
+                        print(f"    [Extracted] Reduced Svc Charge: {val}")
                     else:
-                        # TOU LOGIC: Strict order to prevent substring collision
-                        if "Super Off-Peak" in row_str:
-                            results[current_season]["off"] = val
-                            print(f"    [Extracted] {current_season} Super Off-Peak: {val}")
-                        elif "Off-Peak" in row_str:
-                            results[current_season]["mid"] = val
-                            print(f"    [Extracted] {current_season} Off-Peak: {val}")
-                        elif "On-Peak" in row_str:
-                            results[current_season]["on"] = val
-                            print(f"    [Extracted] {current_season} On-Peak: {val}")
+                        results["service_charge"] = val
+                        print(f"    [Extracted] Standard Svc Charge: {val}")
 
-                # Fixed Charge Logic
-                if "Base Services Charge" in row_str:
-                    charge_val = get_best_decimal_from_row(row)
-                    if charge_val > 0:
-                        # Check if this row is for DRAH or FERA reduced rates
-                        if "DRAH" in row_str or "FERA" in row_str:
-                            results["service_charge_reduced"] = charge_val
-                            print(f"    [Extracted] Reduced Svc Charge: {charge_val}")
-                        else:
-                            results["service_charge"] = charge_val
-                            print(f"    [Extracted] Standard Svc Charge: {charge_val}")
-
-                # Global Baseline Credit
-                if "Baseline Adjustment Credit" in row_str:
-                    credit_val = get_best_decimal_from_row(row)
-                    if credit_val != 0:
-                        results["baseline_credit"] = abs(credit_val)
-                        print(f"    [Extracted] Baseline Credit: {results['baseline_credit']}")
+            # 4. BASELINE CREDIT
+            if "Baseline Adjustment Credit" in line_clean:
+                # Capture values in parentheses like (0.10892)
+                credit_match = re.findall(r"\(?\d+\.\d{5}\)?", line_clean)
+                if credit_match:
+                    results["baseline_credit"] = abs(extract_decimal(credit_match[-1]))
+                    print(f"    [Extracted] Baseline Credit: {results['baseline_credit']}")
 
     return results
 
@@ -113,9 +118,7 @@ def main():
     dry_run = "--dry-run" in sys.argv
     if dry_run: print("!!! DRY RUN MODE ACTIVE !!!")
 
-    if not os.path.exists(UPLOAD_DIR):
-        print(f"Error: {UPLOAD_DIR} directory not found.")
-        return
+    if not os.path.exists(UPLOAD_DIR): return
 
     try:
         with open(JSON_FILE, 'r') as f:
@@ -144,11 +147,10 @@ def main():
                 return new_val
             return current_val
 
-        # Apply Service Charges
+        # Map to JSON slots
         p["dailyServiceCharge"] = update_val("Fixed", "Std Svc Charge", p.get("dailyServiceCharge"), pdf_data["service_charge"])
         p["dailyServiceChargeLowIncome"] = update_val("Fixed", "Reduced Svc Charge", p.get("dailyServiceChargeLowIncome"), pdf_data["service_charge_reduced"])
 
-        # Apply Rates
         for s in ["summer", "winter"]:
             p[s]["onPeak"] = update_val(s.capitalize(), "On/T1", p[s].get("onPeak"), pdf_data[s]["on"])
             p[s]["offPeak"] = update_val(s.capitalize(), "Off/T2", p[s].get("offPeak"), pdf_data[s]["mid"])

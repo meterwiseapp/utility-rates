@@ -1,0 +1,74 @@
+name: PG&E Auto/Manual Update
+
+on:
+  # 1. Scheduled: 1st of every month at 09:00 UTC
+  schedule:
+    - cron: '0 9 1 * *'
+
+  # 2. File-Driven: Trigger when a PDF is uploaded to pge_uploads
+  push:
+    paths:
+      - 'pge_uploads/**.pdf'
+
+  # 3. Manual: The Testing Toggle
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry Run Mode (do not save to JSON)'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  pge-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pdfplumber
+
+      - name: Run PG&E Scrapers
+        run: |
+          # Check if this was a manual run with Dry Run checked
+          # Or if we should default to false for schedule/push triggers
+          DRY_RUN_ARG=""
+          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            DRY_RUN_ARG="--dry-run"
+            echo "--- DRY RUN MODE ENABLED ---"
+          fi
+          
+          # 1. Run the URL Scraper (pge_scraper.py)
+          echo "Executing URL Scraper..."
+          python pge_scraper.py $DRY_RUN_ARG
+          
+          # 2. Run the PDF Parser (pge_tariff_parser.py)
+          echo "Executing PDF Tariff Parser..."
+          python pge_tariff_parser.py $DRY_RUN_ARG
+
+      - name: Commit and Push Changes
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          git config --global user.name "MeterWise PGE Bot"
+          git config --global user.email "bot@meterwise.pro"
+          
+          git add pge_rates.json
+          
+          if git diff --staged --quiet; then
+            echo "No changes to pge_rates.json. Skipping commit."
+          else
+            git commit -m "Automated PG&E Rate Update: $(date +'%Y-%m-%d %H:%M')"
+            git push
+          fi

@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Dry Run Mode (do not save to JSON)'
+        description: 'Dry Run'
         required: true
         type: boolean
         default: false
@@ -52,11 +52,11 @@ jobs:
           
           # 1. Run the URL Scraper (pge_scraper.py)
           echo "Executing URL Scraper..."
-          python pge_scraper.py $DRY_RUN_ARG
+          python update_pge_rates.py $DRY_RUN_ARG
           
           # 2. Run the PDF Parser (pge_tariff_parser.py)
           echo "Executing PDF Tariff Parser..."
-          python pge_tariff_parser.py $DRY_RUN_ARG
+          python parse_pge_manual.py $DRY_RUN_ARG
 
       - name: Commit and Push Changes
         if: github.event.inputs.dry_run != 'true'

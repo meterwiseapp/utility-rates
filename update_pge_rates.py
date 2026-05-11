@@ -23,60 +23,76 @@ def download_pdf(url, save_path):
         print(f"[Error] Failed to download PDF: {e}")
         sys.exit(1)
 
+def extract_rates_from_chunk(text):
+    """Finds all XX¢ patterns in a text block and returns them as sorted floats (dollars)"""
+    matches = re.findall(r"(\d+)¢", text)
+    rates = sorted([float(m) / 100 for m in matches], reverse=True)
+    return rates
+
 def parse_pge_marketing_pdf(pdf_path):
-    print(f"\n[Scanning PDF] {os.path.basename(pdf_path)}")
+    print(f"\n[Scanning PDF Content] {os.path.basename(pdf_path)}")
     
-    # Initialize data structure
-    extracted_data = {
-        "E-1 tiered": {"summer": {"on": 0.0}, "winter": {"on": 0.0}},
-        "E-TOU-C": {"summer": {"on": 0.0, "off": 0.0}, "winter": {"on": 0.0, "off": 0.0}},
-        "E-TOU-D": {"summer": {"on": 0.0, "off": 0.0}, "winter": {"on": 0.0, "off": 0.0}},
-        "E-ELEC": {"summer": {"on": 0.0, "mid": 0.0, "off": 0.0}, "winter": {"on": 0.0, "mid": 0.0, "off": 0.0}},
-        "EV2-A": {"summer": {"on": 0.0, "mid": 0.0, "off": 0.0}, "winter": {"on": 0.0, "mid": 0.0, "off": 0.0}},
-        "EV-B": {"summer": {"on": 0.0, "mid": 0.0, "off": 0.0}, "winter": {"on": 0.0, "mid": 0.0, "off": 0.0}}
+    with pdfplumber.open(pdf_path) as pdf:
+        full_text = ""
+        for page in pdf.pages:
+            full_text += (page.extract_text() or "") + "\n"
+
+    # Define how to find the start of each plan's data block
+    plan_markers = {
+        "E-1 tiered": "Tiered Rate Plan (E-1)",
+        "E-TOU-C": "Time-of-Use (E-TOU-C)",
+        "E-TOU-D": "Time-of-Use (E-TOU-D)",
+        "E-ELEC": "Electric Home Rate Plan (E-ELEC)",
+        "EV2-A": "Home Charging EV2-A",
+        "EV-B": "Electric Vehicle Rate Plan EV-B"
     }
 
-    with pdfplumber.open(pdf_path) as pdf:
-        for p_idx, page in enumerate(pdf.pages):
-            text = page.extract_text()
-            if not text: continue
-            
-            lines = text.split('\n')
-            for line in lines:
-                # Debug: Show lines that contain currency symbols to verify scraper is "seeing" them
-                if "¢" in line or "c/kWh" in line.lower():
-                    # print(f"  [Raw Line Scan] {line.strip()}") # Uncomment for extreme verbosity
-                    
-                    # Regex to find whole numbers or decimals followed by cent sign
-                    cents_matches = re.findall(r"(\d+(?:\.\d+)?)¢", line)
-                    if not cents_matches: continue
-                    
-                    val = float(cents_matches[0]) / 100
-                    
-                    # Logic Mapping with Verbose Feedback
-                    if "Tier 1" in line and "E-1" in line:
-                        print(f"    -> Matched E-1 Tier 1: {val}")
-                        extracted_data["E-1 tiered"]["summer"]["on"] = val
-                        extracted_data["E-1 tiered"]["winter"]["on"] = val
-                    
-                    elif "Peak" in line and "4–9 p.m." in line:
-                        print(f"    -> Matched E-TOU-C Peak (4-9): {val}")
-                        extracted_data["E-TOU-C"]["summer"]["on"] = val
-                    
-                    elif "Off-Peak" in line and "E-TOU-C" in line:
-                        print(f"    -> Matched E-TOU-C Off-Peak: {val}")
-                        extracted_data["E-TOU-C"]["summer"]["off"] = val
-                        
-                    elif "Electrification" in line or "E-ELEC" in line:
-                        if "Peak" in line: 
-                            print(f"    -> Matched E-ELEC Peak: {val}")
-                            extracted_data["E-ELEC"]["summer"]["on"] = val
-                    
-                    elif "EV2-A" in line and "Peak" in line:
-                        print(f"    -> Matched EV2-A Peak: {val}")
-                        extracted_data["EV2-A"]["summer"]["on"] = val
+    results = {}
 
-    return extracted_data
+    # Iterate through plans and find their specific blocks of text
+    plan_keys = list(plan_markers.keys())
+    for i, key in enumerate(plan_keys):
+        start_marker = plan_markers[key]
+        start_idx = full_text.find(start_marker)
+        
+        if start_idx == -1:
+            print(f"  [Warn] Could not find marker for {key}")
+            continue
+            
+        # The block ends where the next plan starts, or at the end of the file
+        end_idx = len(full_text)
+        if i + 1 < len(plan_keys):
+            next_marker = plan_markers[plan_keys[i+1]]
+            found_next = full_text.find(next_marker)
+            if found_next != -1: end_idx = found_next
+            
+        plan_block = full_text[start_idx:end_idx]
+        
+        # Split block into Summer and Winter
+        summer_idx = plan_block.find("Summer")
+        winter_idx = plan_block.find("Winter")
+        
+        results[key] = {"summer": {}, "winter": {}}
+        
+        # Extract Summer Rates
+        if summer_idx != -1:
+            s_end = winter_idx if winter_idx > summer_idx else len(plan_block)
+            s_rates = extract_rates_from_chunk(plan_block[summer_idx:s_end])
+            if s_rates:
+                results[key]["summer"]["onPeak"] = s_rates[0] # Highest
+                if len(s_rates) >= 2: results[key]["summer"]["offPeak"] = s_rates[1]
+                if len(s_rates) >= 3: results[key]["summer"]["superOffPeak"] = s_rates[-1] # Lowest
+
+        # Extract Winter Rates
+        if winter_idx != -1:
+            w_start = winter_idx
+            w_rates = extract_rates_from_chunk(plan_block[w_start:])
+            if w_rates:
+                results[key]["winter"]["onPeak"] = w_rates[0]
+                if len(w_rates) >= 2: results[key]["winter"]["offPeak"] = w_rates[1]
+                if len(w_rates) >= 3: results[key]["winter"]["superOffPeak"] = w_rates[-1]
+
+    return results
 
 def main():
     parser = argparse.ArgumentParser()
@@ -90,7 +106,7 @@ def main():
     new_data = parse_pge_marketing_pdf(tmp_pdf)
     
     if not os.path.exists(JSON_FILE):
-        print(f"[Error] {JSON_FILE} not found in root.")
+        print(f"[Error] {JSON_FILE} not found.")
         return
 
     with open(JSON_FILE, 'r') as f:
@@ -100,30 +116,28 @@ def main():
     updated = False
     
     for plan, seasons in new_data.items():
-        if plan in current_json["plans"]:
-            for season, bins in seasons.items():
-                for bin_type, rate in bins.items():
-                    # Align internal bin names to JSON keys
-                    json_key = "onPeak"
-                    if bin_type == "off": json_key = "offPeak"
-                    elif bin_type == "mid": json_key = "offPeak" 
+        if plan not in current_json["plans"]: continue
+        
+        for season in ["summer", "winter"]:
+            # Standardizing bins to check against JSON
+            bins_to_check = ["onPeak", "offPeak", "superOffPeak"]
+            
+            for b_type in bins_to_check:
+                rate = seasons[season].get(b_type, 0)
+                if rate == 0: continue
+                
+                current_val = current_json["plans"][plan][season].get(b_type, 0)
+                diff = abs(rate - current_val)
+                
+                status = "[MATCH]" if diff < 0.00001 else "[CHANGE DETECTED]"
+                print(f"  {status} {plan:12} ({season:6} {b_type:12}): JSON=${current_val:.5f} | PDF=${rate:.5f} | Delta=${diff:.5f}")
 
-                    current_val = current_json["plans"][plan][season].get(json_key, 0)
-                    
-                    # Log every bin for visibility
-                    status = "[MATCH]"
-                    diff = abs(rate - current_val)
-                    
-                    if rate == 0:
-                        status = "[SKIP] (Not found in PDF)"
-                    elif diff > 0.00001:
-                        status = "[CHANGE DETECTED]"
-                    
-                    print(f"  {status} {plan} ({season} {json_key}): JSON=${current_val:.5f} | PDF=${rate:.5f} | Delta=${diff:.5f}")
-
-                    if rate > 0 and diff > 0.01: # Significant change threshold
-                        current_json["plans"][plan][season][json_key] = rate
-                        updated = True
+                # Threshold: Marketing PDF only has 2-decimal precision (cents).
+                # We only update if the difference is more than 1 cent to avoid 
+                # overwriting high-precision manual data with rounded marketing data.
+                if diff > 0.01: 
+                    current_json["plans"][plan][season][b_type] = rate
+                    updated = True
 
     if updated:
         if not args.dry_run:
@@ -134,7 +148,7 @@ def main():
         else:
             print("\n>>> Result: Dry Run complete. Changes were found but NOT saved.")
     else:
-        print("\n>>> Result: No significant changes to save.")
+        print("\n>>> Result: No significant changes (Delta > $0.01) detected.")
 
     if os.path.exists(tmp_pdf): os.remove(tmp_pdf)
 

@@ -24,7 +24,8 @@ def download_xlsx(url, save_path):
         sys.exit(1)
 
 def clean_val(val):
-    if pd.isna(val) or val == "-" or str(val).strip() == "": return 0.0
+    """Safely converts Excel cell values to float, handling currency and negatives."""
+    if pd.isna(val) or str(val).strip() in ["", "-", "None"]: return 0.0
     s = str(val).replace('$', '').replace(',', '').strip()
     if '(' in s and ')' in s:
         s = "-" + s.replace('(', '').replace(')', '')
@@ -39,12 +40,13 @@ def parse_pge_xlsx(file_path):
     extracted_data = {}
     baseline_credit_found = None
 
+    # Markers based exactly on your CSV dump
     plan_markers = {
-        "E-1 tiered": ["E1,", "Tiered Energy Charges"],
-        "E-TOU-C": ["E-TOU-C"],
-        "E-TOU-D": ["E-TOU-D"],
-        "E-ELEC": ["E-ELEC"],
-        "EV2-A": ["EV2"],
+        "E-1 tiered": ["E1, ESR", "Tiered Energy Charges"],
+        "E-TOU-C": ["Rate Schedule E-TOU-C"],
+        "E-TOU-D": ["Rate Schedule E-TOU-D"],
+        "E-ELEC": ["Rate Schedule E-ELEC"],
+        "EV2-A": ["Rate Schedule EV2"],
         "EV-B": ["EV, Rate B"]
     }
 
@@ -56,8 +58,9 @@ def parse_pge_xlsx(file_path):
         current_season = "summer"
 
         for idx, row in df.iterrows():
-            row_list = row.astype(str).tolist()
-            row_str = " ".join(row_list).lower()
+            # FIX: Explicit list comprehension to force strings and handle the TypeError
+            row_vals = [str(item) for item in row.tolist()]
+            row_str = " ".join(row_vals).lower()
             
             # 1. Identify Plan Start
             for json_id, markers in plan_markers.items():
@@ -65,15 +68,15 @@ def parse_pge_xlsx(file_path):
                     current_plan_id = json_id
                     if current_plan_id not in extracted_data:
                         extracted_data[current_plan_id] = {"summer": {}, "winter": {}}
-                    print(f"    [Found] Plan Anchor: {json_id} (Row {idx})")
+                    print(f"    [Found] {json_id} block start (Row {idx})")
 
             if not current_plan_id: continue
 
-            # 2. Update Season Context (Persists across rows)
+            # 2. Update Season Context
             if "summer" in row_str: current_season = "summer"
             elif "winter" in row_str: current_season = "winter"
 
-            # 3. Handle E-1 Tiered
+            # 3. Handle E-1 Tiered (Table 1: Col 8 and 9)
             if current_plan_id == "E-1 tiered":
                 if "tiered energy charges" in row_str:
                     t1 = clean_val(row.iloc[8])
@@ -84,23 +87,22 @@ def parse_pge_xlsx(file_path):
                         print(f"      -> E-1 Captured: T1={t1}, T2={t2}")
                 continue
 
-            # 4. Handle TOU Rows (C, D, EV, ELEC)
-            # Column mapping differs by sheet based on your CSV
-            # Standard: Col 8=Period, Col 9=Rate | EV/Tech: Col 7=Period, Col 8=Rate
+            # 4. Determine Column Mapping based on CSV structure
+            # Standard (E-TOU-C/D) use Col 8/9 | EV/Tech use Col 7/8
             is_ev_tech = any(x in current_plan_id for x in ["EV", "ELEC"])
             period_col = 7 if is_ev_tech else 8
             rate_col = 8 if is_ev_tech else 9
             
-            period_cell = str(row.iloc[period_col]).lower() if len(row) > period_col else ""
+            if len(row) <= max(period_col, rate_col): continue
+            
+            period_cell = str(row.iloc[period_col]).lower()
             
             if "peak" in period_cell:
                 rate = clean_val(row.iloc[rate_col])
                 if rate > 0:
-                    # Mapping
                     if "peak" in period_cell and "off" not in period_cell and "part" not in period_cell:
                         extracted_data[current_plan_id][current_season]["onPeak"] = rate
                     elif "off-peak" in period_cell:
-                        # Map to lowest available slot
                         key = "superOffPeak" if is_ev_tech else "offPeak"
                         extracted_data[current_plan_id][current_season][key] = rate
                     elif "part" in period_cell:
@@ -108,12 +110,11 @@ def parse_pge_xlsx(file_path):
                     
                     print(f"      -> {current_plan_id} {current_season} {period_cell}: {rate}")
 
-                # 5. Capture Baseline Credit (Specific to E-TOU-C)
-                if current_plan_id == "E-TOU-C" and len(row) > 10:
+                # 5. Baseline Credit (Standard Table: Col 10)
+                if not is_ev_tech and len(row) > 10:
                     b_val = clean_val(row.iloc[10])
                     if b_val < 0: 
                         baseline_credit_found = abs(b_val)
-                        print(f"      -> Global Baseline Credit Found: {baseline_credit_found}")
 
     return extracted_data, baseline_credit_found
 
@@ -127,8 +128,13 @@ def main():
     tmp_xlsx = "pge_temp.xlsx"
     download_xlsx(XLSX_URL, tmp_xlsx)
     
-    new_data, b_credit = parse_pge_xlsx(tmp_xlsx)
-    
+    try:
+        new_data, b_credit = parse_pge_xlsx(tmp_xlsx)
+    except Exception as e:
+        print(f"[Error] Parser Failure: {e}")
+        if os.path.exists(tmp_xlsx): os.remove(tmp_xlsx)
+        return
+
     if not os.path.exists(JSON_FILE):
         print(f"[Error] {JSON_FILE} not found.")
         return
@@ -143,7 +149,7 @@ def main():
         old_bc = current_json.get("baselineCredit", 0)
         if abs(b_credit - old_bc) > 0.0001:
             print(f"  [CHANGE] Global Baseline Credit: ${old_bc:.5f} -> ${b_credit:.5f}")
-            current_json["baselineCredit"] = b_credit
+            if not args.dry_run: current_json["baselineCredit"] = b_credit
             updated = True
 
     for plan in ["E-1 tiered", "E-TOU-C", "E-TOU-D", "E-ELEC", "EV2-A", "EV-B"]:
@@ -157,6 +163,7 @@ def main():
                 current_val = current_json["plans"][plan][season].get(b_type, 0)
                 diff = abs(rate - current_val)
                 status = "[MATCH]" if diff < 0.0001 else "[CHANGE DETECTED]"
+                
                 print(f"  {status} {plan:12} ({season:6} {b_type:12}): JSON=${current_val:.5f} | XLSX=${rate:.5f}")
 
                 if diff > 0.0001: 

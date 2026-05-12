@@ -24,7 +24,7 @@ def download_xlsx(url, save_path):
         sys.exit(1)
 
 def clean_val(val):
-    if pd.isna(val): return 0.0
+    if pd.isna(val) or val == "-": return 0.0
     s = str(val).replace('$', '').replace(',', '').strip()
     if '(' in s and ')' in s:
         s = "-" + s.replace('(', '').replace(')', '')
@@ -33,88 +33,64 @@ def clean_val(val):
     except:
         return 0.0
 
-def find_column_indices(df):
-    """
-    Scans the first 15 rows of a sheet to find the functional column indices.
-    Returns a dict of {key: index}
-    """
-    indices = {"schedule": 0, "season": -1, "period": -1, "rate": -1, "baseline_credit": -1, "t1": -1, "t2": -1}
-    
-    # We look at the first 15 rows to find header keywords
-    for i in range(min(len(df), 15)):
-        row = df.iloc[i].astype(str).str.lower().tolist()
-        for idx, cell in enumerate(row):
-            if "schedule" in cell: indices["schedule"] = idx
-            if "season" in cell: indices["season"] = idx
-            if "time-of-use" in cell or "period" in cell: indices["period"] = idx
-            if "energy charge" in cell: indices["rate"] = idx
-            if "baseline credit" in cell: indices["baseline_credit"] = idx
-            if "tier 1 usage" in cell: indices["t1"] = idx
-            if "tier 2 usage" in cell: indices["t2"] = idx
-            
-    return indices
-
 def parse_pge_xlsx(file_path):
     print(f"\n[Excel Scan] Processing workbook...")
     xlsx = pd.ExcelFile(file_path)
     extracted_data = {}
     baseline_credit_found = None
 
-    plan_map = {
-        "E-1 tiered": "E1",
-        "E-TOU-C": "E-TOU-C",
-        "E-TOU-D": "E-TOU-D",
-        "E-ELEC": "E-ELEC",
-        "EV2-A": "EV2",
-        "EV-B": "EV, Rate B"
+    # Map of JSON ID to the text markers found in your CSV
+    plan_markers = {
+        "E-1 tiered": ["E1,", "Tiered Energy Charges"],
+        "E-TOU-C": ["E-TOU-C"],
+        "E-TOU-D": ["E-TOU-D"],
+        "E-ELEC": ["E-ELEC"],
+        "EV2-A": ["EV2"],
+        "EV-B": ["EV, Rate B"]
     }
 
     for sheet_name in xlsx.sheet_names:
+        print(f"  > Scanning Sheet: {sheet_name}")
         df = xlsx.parse(sheet_name, header=None)
-        col = find_column_indices(df)
         
-        # Check if this sheet has the minimum columns needed to be useful
-        if col["rate"] == -1: continue
+        current_plan_id = None
+        current_season = "summer"
 
-        for json_id, search_term in plan_map.items():
-            # Find rows matching the plan name in the detected Schedule column
-            mask = df.iloc[:, col["schedule"]].astype(str).str.contains(search_term, na=False, case=False)
-            matches = df[mask]
+        for idx, row in df.iterrows():
+            row_str = " ".join(row.astype(str).tolist()).lower()
             
-            if matches.empty: continue
-            
-            if json_id not in extracted_data:
-                extracted_data[json_id] = {"summer": {}, "winter": {}}
+            # 1. Identify if this row starts a new Plan block
+            for json_id, markers in plan_markers.items():
+                if any(m.lower() in row_str for m in markers):
+                    current_plan_id = json_id
+                    if current_plan_id not in extracted_data:
+                        extracted_data[current_plan_id] = {"summer": {}, "winter": {}}
+                    # print(f"    [Found] Start of {json_id} at row {idx}")
 
-            start_idx = matches.index[0]
-            # Scan 12 rows following the plan name to capture all TOU/Season combinations
-            for i in range(start_idx, min(start_idx + 12, len(df))):
-                row = df.iloc[i]
+            if not current_plan_id: continue
+
+            # 2. Update Season context
+            if "summer" in row_str: current_season = "summer"
+            elif "winter" in row_str: current_season = "winter"
+
+            # 3. Handle E-1 Tiered (Unique column-based layout)
+            if current_plan_id == "E-1 tiered":
+                # Looking for the row with Tier 1 and Tier 2 values (usually row starting with 'Residential Schedules')
+                if "tiered energy charges" in row_str:
+                    # Based on CSV: Col 8 = T1, Col 9 = T2
+                    t1 = clean_val(row.iloc[8])
+                    t2 = clean_val(row.iloc[9])
+                    if t1 > 0:
+                        extracted_data["E-1 tiered"]["summer"] = {"onPeak": t2, "offPeak": t1}
+                        extracted_data["E-1 tiered"]["winter"] = {"onPeak": t2, "offPeak": t1}
+                continue
+
+            # 4. Handle TOU Plans (E-TOU-C, E-TOU-D, EV, ELEC)
+            # We look for rows that contain "Peak" or "Off-Peak"
+            period_cell = str(row.iloc[7]).lower() if len(row) > 7 else ""
+            if "peak" in period_cell or "part" in period_cell:
+                # Based on CSV: Column 9 is rate for Standard, Column 8 for EV/Tech
+                rate = clean_val(row.iloc[9]) if "E-TOU" in current_plan_id else clean_val(row.iloc[8])
                 
-                # Special Case: E-1 Tiered (No separate TOU rows)
-                if json_id == "E-1 tiered":
-                    if col["t1"] != -1 and col["t2"] != -1:
-                        t1 = clean_val(row.iloc[col["t1"]])
-                        t2 = clean_val(row.iloc[col["t2"]])
-                        if t1 > 0:
-                            extracted_data[json_id]["summer"] = {"onPeak": t2, "offPeak": t1}
-                            extracted_data[json_id]["winter"] = {"onPeak": t2, "offPeak": t1}
-                            break
-                    continue
-
-                # Standard TOU Logic
-                season_raw = str(row.iloc[col["season"]]).lower() if col["season"] != -1 else ""
-                period_raw = str(row.iloc[col["period"]]).lower() if col["period"] != -1 else ""
-                rate = clean_val(row.iloc[col["rate"]])
-                
-                if rate <= 0: continue
-
-                target_season = "summer" if "summer" in season_raw else "winter" if "winter" in season_raw else None
-                # Many sheets merge the season cell; if season is empty, use the last known season
-                if target_season is None and i > start_idx:
-                    # Look up one row for season
-                    target_season = "summer" if "summer" in str(df.iloc[i-1, col["season"]]).lower() else "winter"
-
-                if target_season:
-                    if "peak" in period_raw and "off" not in period_raw and "part" not in period_raw:
-                        extracted_dat
+                if rate > 0:
+                    # Mapping logic

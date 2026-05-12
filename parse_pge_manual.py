@@ -13,7 +13,7 @@ JSON_FILE = "pge_rates.json"
 def extract_pge_tariff_data(pdf_path):
     """
     Parses official PG&E Residential Tariff Sheets.
-    Targets 'Total Usage' side-by-side rates and 5-part NBCs.
+    Includes a value-floor to prevent adjustments from overwriting bundled rates.
     """
     results = {"plan_id": None, "rates": {}, "nbc_total": 0.0}
     
@@ -54,35 +54,44 @@ def extract_pge_tariff_data(pdf_path):
         for line in lines:
             line_clean = line.strip()
             
-            # THE 'TOTAL USAGE' PATTERN (Used by TOU-C, TOU-D, and often E-1)
-            # This is the most reliable way to get the final "all-in" rate.
-            if line_clean.startswith("Total Usage") or "Total Bundled" in line_clean:
+            # PATTERN 1: 'Total Usage' (High Priority - usually correct)
+            if line_clean.startswith("Total Usage"):
                 decimals = re.findall(r"(\d+\.\d{5})", line_clean)
                 if len(decimals) >= 2:
                     total_usage_count += 1
                     season = "summer" if total_usage_count == 1 else "winter"
                     results["rates"][f"{season}_on"] = float(decimals[0])
                     results["rates"][f"{season}_off"] = float(decimals[1])
-                    print(f"    [Captured] {season.upper()}: Rate 1=${decimals[0]}, Rate 2=${decimals[1]}")
+                    print(f"    [Captured Total] {season.upper()}: Peak=${decimals[0]}, Off-Peak=${decimals[1]}")
             
-            # THE 'TIERED' PATTERN (Specifically for E-1 when Total Usage isn't matched)
-            # We use "Negative Lookahead" keywords to avoid sub-components and adjustments.
+            # PATTERN 2: 'Tiered' (E-1 specific fallback)
             elif "Tier 1" in line_clean or "Tier 2" in line_clean:
-                # SKIP lines that are adjustments, credits, or income-based fees
-                if any(x in line_clean for x in ["Adjustment", "Income", "Credit", "Minimum"]):
+                # STRATEGIC FILTERS:
+                # Skip if line mentions sub-components or adjustments
+                if any(x in line_clean for x in ["Adjustment", "Income", "Credit", "Limiter", "Component"]):
                     continue
                 
                 decimals = re.findall(r"(\d+\.\d{5})", line_clean)
                 if decimals:
-                    rate_val = float(decimals[-1]) # Total is always the last column
+                    rate_val = float(decimals[-1])
+                    
+                    # VALUE FLOOR: Bundled rates are > $0.20. Adjustments are usually < $0.05.
+                    if rate_val < 0.20:
+                        continue
+                        
                     if "Tier 1" in line_clean:
-                        results["rates"]["summer_off"] = rate_val
-                        results["rates"]["winter_off"] = rate_val
-                        print(f"    [Captured] E-1 TIER 1: {rate_val:.5f}")
-                    else:
-                        results["rates"]["summer_on"] = rate_val
-                        results["rates"]["winter_on"] = rate_val
-                        print(f"    [Captured] E-1 TIER 2: {rate_val:.5f}")
+                        # Only update if the new value is higher (ensures bundled > adjustment)
+                        current = results["rates"].get("summer_off", 0)
+                        if rate_val > current:
+                            results["rates"]["summer_off"] = rate_val
+                            results["rates"]["winter_off"] = rate_val
+                            print(f"    [Captured Tier] E-1 TIER 1: {rate_val:.5f}")
+                    elif "Tier 2" in line_clean:
+                        current = results["rates"].get("summer_on", 0)
+                        if rate_val > current:
+                            results["rates"]["summer_on"] = rate_val
+                            results["rates"]["winter_on"] = rate_val
+                            print(f"    [Captured Tier] E-1 TIER 2: {rate_val:.5f}")
 
     return results
 

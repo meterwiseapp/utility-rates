@@ -1,18 +1,18 @@
 {
-  "lastUpdated": "2026-05-12 22:35",
+  "lastUpdated": "2026-05-12 22:51",
   "nbcRate": 0.020909999999999998,
   "baselineCredit": 0.0814,
   "sbpExportRate": 0.075,
   "plans": {
     "E-1 tiered": {
       "summer": {
-        "onPeak": 0.04089,
-        "offPeak": 0.04052,
+        "onPeak": 0.40702,
+        "offPeak": 0.32561,
         "superOffPeak": 0.52
       },
       "winter": {
-        "onPeak": 0.04089,
-        "offPeak": 0.04052,
+        "onPeak": 0.40702,
+        "offPeak": 0.32561,
         "superOffPeak": 0.49
       }
     },

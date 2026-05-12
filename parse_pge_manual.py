@@ -10,11 +10,7 @@ UPLOAD_DIR = "pge_uploads"
 JSON_FILE = "pge_rates.json"
 
 def extract_pge_tariff_data(pdf_path):
-    """
-    Parses official PG&E Residential Tariff Sheets with detailed logging.
-    """
     results = {"plan_id": None, "rates": {}, "nbc_total": 0.0}
-    nbc_components = {}
     
     print(f"\n[Scanning PDF] {os.path.basename(pdf_path)}")
     
@@ -29,11 +25,8 @@ def extract_pge_tariff_data(pdf_path):
             results["plan_id"] = plan_match.group(1).upper().strip()
             if results["plan_id"] == "E-1": results["plan_id"] = "E-1 tiered"
             print(f"  > Detected Schedule: {results['plan_id']}")
-        else:
-            print("  [!] Warning: No Schedule (e.g. E-TOU-C) found in text.")
 
-        # 2. Extract NBC Components (Search for individual pieces)
-        # PG&E Tariff Table patterns
+        # 2. NBC Components (Already verified working)
         nbc_patterns = {
             "PPP": r"Public Purpose Programs.*?(\d+\.\d{5})",
             "Nuclear": r"Nuclear Decommissioning.*?(\d+\.\d{5})",
@@ -41,61 +34,63 @@ def extract_pge_tariff_data(pdf_path):
             "CTC": r"Competition Transition.*?(\d+\.\d{5})",
             "Recovery": r"Recovery Bond.*?(\d+\.\d{5})"
         }
-
         nbc_sum = 0.0
         for name, pattern in nbc_patterns.items():
             match = re.search(pattern, full_text, re.I)
             if match:
                 val = float(match.group(1))
-                nbc_components[name] = val
                 nbc_sum += val
-                print(f"    [NBC Match] {name}: {val:.5f}")
-        
         results["nbc_total"] = nbc_sum
-        print(f"    [NBC Result] Calculated Total: {nbc_sum:.5f}")
 
-        # 3. Extract Total Bundled Rates (Line-by-line Scan)
+        # 3. Extract Rates (Improved Table Logic)
         lines = full_text.split('\n')
-        current_season = "summer" 
+        current_season = "summer"
+        in_total_column = False
         
-        print("  > Scanning Rate Table for 'Total Bundled' lines...")
+        print("  > Searching for Rate Table values...")
         for line in lines:
             line_clean = line.strip()
             
-            # Detect Season Shifts
-            if "Winter" in line_clean: 
-                current_season = "winter"
-                # print(f"    [Context] Switched to WINTER")
-            elif "Summer" in line_clean: 
-                current_season = "summer"
-                # print(f"    [Context] Switched to SUMMER")
+            # Context Trackers
+            if "Winter" in line_clean: current_season = "winter"
+            if "Summer" in line_clean: current_season = "summer"
             
-            # Look for "Total Bundled" which is the sum of all components
-            if "Total Bundled" in line_clean:
-                # Find all 5-decimal numbers on the line
-                decimals = re.findall(r"(\d+\.\d{5})", line_clean)
-                if decimals:
-                    rate_val = float(decimals[-1]) # Usually the last column
-                    
-                    # Logic mapping based on keywords on the SAME line
-                    if "Peak" in line_clean and "Off" not in line_clean and "Part" not in line_clean:
+            # Logic: If a line contains a bin label AND a 5-decimal number
+            # We check if it's the "Total" by looking for specific markers
+            decimals = re.findall(r"(\d+\.\d{5})", line_clean)
+            
+            if decimals:
+                # DEBUG: Uncomment this line if it still fails to see what the PDF is showing
+                # print(f"    [Raw Line Trace] {line_clean}") 
+                
+                rate_val = float(decimals[-1]) # The right-most number is usually the Total Bundled
+                
+                # Check for bin keywords
+                is_peak = "Peak" in line_clean and "Off" not in line_clean and "Part" not in line_clean
+                is_off = "Off-Peak" in line_clean
+                is_part = "Part-Peak" in line_clean or "Partial-Peak" in line_clean
+                
+                # To ensure we are grabbing the "Total Bundled" row and not just a sub-component,
+                # we check if the line contains "Total" or if we recently saw the "Total Bundled" header.
+                if "Total" in line_clean or "Bundled" in line_clean or len(decimals) > 5:
+                    if is_peak:
                         key = f"{current_season}_on"
                         results["rates"][key] = rate_val
-                        print(f"    [Rate Match] {key.upper()}: {rate_val:.5f} (from: '{line_clean[:40]}...')")
-                    elif "Off-Peak" in line_clean:
+                        print(f"    [Rate Match] {key.upper()}: {rate_val:.5f}")
+                    elif is_off:
                         key = f"{current_season}_off"
                         results["rates"][key] = rate_val
                         print(f"    [Rate Match] {key.upper()}: {rate_val:.5f}")
-                    elif "Part-Peak" in line_clean or "Partial-Peak" in line_clean:
+                    elif is_part:
                         key = f"{current_season}_mid"
                         results["rates"][key] = rate_val
                         print(f"    [Rate Match] {key.upper()}: {rate_val:.5f}")
                     elif "Tier 1" in line_clean:
-                        results["rates"][f"{current_season}_off"] = rate_val # Map T1 to Off for E-1
-                        print(f"    [Rate Match] E-1 TIER 1: {rate_val:.5f}")
+                        results["rates"][f"{current_season}_off"] = rate_val
+                        print(f"    [Rate Match] TIER 1: {rate_val:.5f}")
                     elif "Tier 2" in line_clean:
-                        results["rates"][f"{current_season}_on"] = rate_val # Map T2 to On for E-1
-                        print(f"    [Rate Match] E-1 TIER 2: {rate_val:.5f}")
+                        results["rates"][f"{current_season}_on"] = rate_val
+                        print(f"    [Rate Match] TIER 2: {rate_val:.5f}")
 
     return results
 

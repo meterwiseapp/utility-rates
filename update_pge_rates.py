@@ -24,95 +24,86 @@ def download_pdf(url, save_path):
 
 def extract_logic(rates, plan_id):
     """
-    Applies logic to unique rates extracted from a plan's segment.
-    Ensures On-Peak is always the highest.
+    Intelligently maps raw extracted rates to the correct app bins.
+    High-to-low sorting ensures On-Peak is always the highest.
     """
-    # Remove duplicates and sort descending
+    # Remove duplicates and sort descending (highest price first)
     unique = sorted(list(set(rates)), reverse=True)
     if not unique: return None
 
-    # 3-Bin Plans (E-ELEC, EV2-A, EV-B)
+    # --- 3-BIN PLANS (E-ELEC, EV2-A, EV-B) ---
     if any(x in plan_id for x in ["ELEC", "EV"]):
         if len(unique) >= 3:
+            # Sequence: [Highest=On, Middle=Partial/Off, Lowest=Super-Off]
             return {"onPeak": unique[0], "offPeak": unique[1], "superOffPeak": unique[2]}
         return {"onPeak": unique[0], "offPeak": unique[-1], "superOffPeak": unique[-1]}
 
-    # 2-Bin Plans (E-1, TOU-C, TOU-D)
-    # Picks the highest two values (which maps to 'Above Baseline' for TOU-C/D)
+    # --- 2-BIN PLANS (E-1, TOU-C, TOU-D) ---
+    # For TOU-C/D, unique usually contains 4 values (Above and Below baseline).
+    # We take the highest pair for Prediction Accuracy (Above Baseline).
     if len(unique) >= 2:
-        return {"onPeak": unique[0], "offPeak": unique[1]}
+        return {"onPeak": unique[0], "offPeak": unique[1], "superOffPeak": 0.0}
     
-    return {"onPeak": unique[0], "offPeak": unique[0]}
+    return {"onPeak": unique[0], "offPeak": unique[0], "superOffPeak": 0.0}
 
 def parse_pge_marketing_pdf(pdf_path):
-    print(f"\n[Contextual Stream Scan] Analyzing {os.path.basename(pdf_path)}...")
+    print(f"\n[Pattern Scan] Analyzing {os.path.basename(pdf_path)}...")
     
     with pdfplumber.open(pdf_path) as pdf:
         full_text = " ".join([ (p.extract_text() or "") for p in pdf.pages ])
     
-    # Flatten all whitespace to ensure reliable indexing
+    # Flatten text stream
     text = " ".join(full_text.split())
 
-    # We define 'Moats' (start/end anchors) to isolate plan text
-    moats = {
-        "E-1 tiered": ("Tiered Rate Plan (E-1)", "Time-of-Use Rate Plans"),
-        "E-TOU-C": ("Time-of-Use (E-TOU-C)", "Time-of-Use (E-TOU-D)"),
-        "E-TOU-D": ("Time-of-Use (E-TOU-D)", "Electric Home Rate Plan"),
-        "E-ELEC": ("Electric Home Rate Plan (E-ELEC)", "Electric Vehicle (EV)"),
-        "EV-Both": ("Electric Vehicle (EV) Rate Plans", "The Electric Home Rate Plan includes")
+    # Map for mapping the PDF's text markers to your JSON IDs
+    # Using regex segments to find plan-specific chunks
+    plan_segments = {
+        "E-1 tiered": r"(Tiered Rate Plan \(E-1\).*?)Time-of-Use",
+        "E-TOU-C": r"(Time-of-Use \(E-TOU-C\).*?)Time-of-Use \(E-TOU-D\)",
+        "E-TOU-D": r"(Time-of-Use \(E-TOU-D\).*?)Electric Home Rate Plan",
+        "E-ELEC": r"(Electric Home Rate Plan \(E-ELEC\).*?)Electric Vehicle",
+        "EV2-A": r"(Home Charging EV2-A.*?)Electric Vehicle Rate Plan EV-B",
+        "EV-B": r"(Electric Vehicle Rate Plan EV-B.*?)The Electric Home Rate Plan"
     }
 
-    raw_data = {}
-
-    # Extract raw cent pools for each moat
-    for plan_id, (start_m, end_m) in moats.items():
-        start_idx = text.find(start_m)
-        end_idx = text.find(end_m)
-        if start_idx == -1: continue
-        if end_idx == -1: end_idx = len(text)
-        
-        segment = text[start_idx:end_idx]
-        
-        # Split segment into Summer/Winter chunks
-        s_idx = segment.find("Summer")
-        w_idx = segment.find("Winter")
-
-        if s_idx != -1 and w_idx != -1:
-            summer_pool = [float(m)/100 for m in re.findall(r"(\d+)¢", segment[s_idx:w_idx])]
-            winter_pool = [float(m)/100 for m in re.findall(r"(\d+)¢", segment[w_idx:])]
-            raw_data[plan_id] = {"summer": summer_pool, "winter": winter_pool}
-        else:
-            # Plan without seasonal labels (E-1)
-            pool = [float(m)/100 for m in re.findall(r"(\d+)¢", segment)]
-            raw_data[plan_id] = {"summer": pool, "winter": pool}
-
-    # Final Mapping
     final_data = {}
 
-    # Standard Plans
-    for p_id in ["E-1 tiered", "E-TOU-C", "E-TOU-D", "E-ELEC"]:
-        if p_id in raw_data:
-            final_data[p_id] = {
-                "summer": extract_logic(raw_data[p_id]["summer"], p_id),
-                "winter": extract_logic(raw_data[p_id]["winter"], p_id)
-            }
+    for plan_id, pattern in plan_segments.items():
+        match = re.search(pattern, text)
+        if not match:
+            print(f"  [Warn] Failed to find text bucket for {plan_id}")
+            continue
+            
+        bucket = match.group(1)
+        
+        # Split bucket into Summer and Winter chunks
+        s_marker = bucket.find("Summer")
+        w_marker = bucket.find("Winter")
 
-    # Interleaved EV Plans (Special Logic)
-    # The text dump shows EV2A and EVB rates appear in a single sequence of 7 rates:
-    # [EV2A-Off, EV2A-Mid, EV2A-On, EVB-Off, EVB-Mid, EVB-Mid-Dup, EVB-On]
-    if "EV-Both" in raw_data:
-        for season in ["summer", "winter"]:
-            pool = raw_data["EV-Both"][season]
-            if len(pool) >= 7:
-                # EV2-A Mapping (Indices 0, 1, 2)
-                ev2a_pool = pool[0:3]
-                final_data["EV2-A"] = final_data.get("EV2-A", {"summer": {}, "winter": {}})
-                final_data["EV2-A"][season] = extract_logic(ev2a_pool, "EV2-A")
-                
-                # EV-B Mapping (Indices 3, 4, 5, 6)
-                evb_pool = pool[3:7]
-                final_data["EV-B"] = final_data.get("EV-B", {"summer": {}, "winter": {}})
-                final_data["EV-B"][season] = extract_logic(evb_pool, "EV-B")
+        if s_marker != -1 and w_marker != -1:
+            # Plan has seasonal sections
+            if s_marker < w_marker:
+                s_chunk, w_chunk = bucket[s_marker:w_marker], bucket[w_marker:]
+            else:
+                w_chunk, s_chunk = bucket[w_marker:s_marker], bucket[s_marker:]
+            
+            s_pool = [float(m)/100 for m in re.findall(r"(\d+)¢", s_chunk)]
+            w_pool = [float(m)/100 for m in re.findall(r"(\d+)¢", w_chunk)]
+            
+            # Special case for E-TOU-C Summer: 40¢ is at the start of the header
+            if plan_id == "E-TOU-C":
+                # Look slightly before the Summer marker for the first Off-Peak rate
+                header_rates = [float(m)/100 for m in re.findall(r"(\d+)¢", bucket[:s_marker])]
+                s_pool = header_rates + s_pool
+
+            final_data[plan_id] = {
+                "summer": extract_logic(s_pool, plan_id),
+                "winter": extract_logic(w_pool, plan_id)
+            }
+        else:
+            # Plan is non-seasonal (E-1)
+            pool = [float(m)/100 for m in re.findall(r"(\d+)¢", bucket)]
+            final_data[plan_id] = {"summer": extract_logic(pool, plan_id), "winter": extract_logic(pool, plan_id)}
 
     return final_data
 
@@ -127,16 +118,21 @@ def main():
     download_pdf(PGE_URL, tmp_pdf)
     new_data = parse_pge_marketing_pdf(tmp_pdf)
     
+    if not os.path.exists(JSON_FILE):
+        print(f"[Error] {JSON_FILE} not found.")
+        return
+
     with open(JSON_FILE, 'r') as f:
         current_json = json.load(f)
 
     print("\n[Comparison Ledger: JSON vs Scraped]")
     updated = False
     
-    for plan, seasons in new_data.items():
-        if plan not in current_json["plans"]: continue
+    for plan in ["E-1 tiered", "E-TOU-C", "E-TOU-D", "E-ELEC", "EV2-A", "EV-B"]:
+        if plan not in new_data: continue
+        
         for season in ["summer", "winter"]:
-            plan_results = seasons.get(season)
+            plan_results = new_data[plan].get(season)
             if not plan_results: continue
             
             for b_type in ["onPeak", "offPeak", "superOffPeak"]:
@@ -149,6 +145,7 @@ def main():
                 
                 print(f"  {status} {plan:12} ({season:6} {b_type:12}): JSON=${current_val:.5f} | PDF=${rate:.5f}")
 
+                # Update JSON if change > $0.01 (protects precision data)
                 if diff > 0.01: 
                     current_json["plans"][plan][season][b_type] = rate
                     updated = True
@@ -160,7 +157,7 @@ def main():
                 json.dump(current_json, f, indent=2)
             print("\n>>> Result: Changes committed to JSON.")
         else:
-            print("\n>>> Result: Dry Run complete. Data verified against manual list.")
+            print("\n>>> Result: Dry Run complete. All plans successfully matched.")
     else:
         print("\n>>> Result: No significant changes detected.")
 

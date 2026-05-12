@@ -61,7 +61,7 @@ def extract_pge_tariff_data(pdf_path):
             
             if decimals:
                 # DEBUG: Uncomment this line if it still fails to see what the PDF is showing
-                # print(f"    [Raw Line Trace] {line_clean}") 
+                print(f"    [Raw Line Trace] {line_clean}") 
                 
                 rate_val = float(decimals[-1]) # The right-most number is usually the Total Bundled
                 

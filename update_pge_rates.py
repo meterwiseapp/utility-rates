@@ -18,16 +18,9 @@ def download_pdf(url, save_path):
         response.raise_for_status()
         with open(save_path, 'wb') as f:
             f.write(response.content)
-        print(f"[Network] Download complete ({len(response.content)} bytes)")
     except Exception as e:
         print(f"[Error] Failed to download PDF: {e}")
         sys.exit(1)
-
-def extract_rates_from_chunk(text):
-    """Finds all XX¢ patterns in a text block and returns them as sorted floats (dollars)"""
-    matches = re.findall(r"(\d+)¢", text)
-    rates = sorted([float(m) / 100 for m in matches], reverse=True)
-    return rates
 
 def parse_pge_marketing_pdf(pdf_path):
     print(f"\n[Scanning PDF Content] {os.path.basename(pdf_path)}")
@@ -36,63 +29,78 @@ def parse_pge_marketing_pdf(pdf_path):
         full_text = ""
         for page in pdf.pages:
             full_text += (page.extract_text() or "") + "\n"
+    
+    # Flatten whitespace to make regex easier across line breaks
+    text = " ".join(full_text.split())
 
-    # Define how to find the start of each plan's data block
-    plan_markers = {
-        "E-1 tiered": "Tiered Rate Plan (E-1)",
-        "E-TOU-C": "Time-of-Use (E-TOU-C)",
-        "E-TOU-D": "Time-of-Use (E-TOU-D)",
-        "E-ELEC": "Electric Home Rate Plan (E-ELEC)",
-        "EV2-A": "Home Charging EV2-A",
-        "EV-B": "Electric Vehicle Rate Plan EV-B"
+    extracted = {
+        "E-1 tiered": {"summer": {}, "winter": {}},
+        "E-TOU-C": {"summer": {}, "winter": {}},
+        "E-TOU-D": {"summer": {}, "winter": {}},
+        "E-ELEC": {"summer": {}, "winter": {}},
+        "EV2-A": {"summer": {}, "winter": {}},
+        "EV-B": {"summer": {}, "winter": {}}
     }
 
-    results = {}
+    # 1. E-1 Tiered Logic (Direct search)
+    e1_match = re.search(r"Tier 1.*?(\d+)¢.*?Tier 2.*?(\d+)¢", text)
+    if e1_match:
+        extracted["E-1 tiered"]["summer"]["onPeak"] = float(e1_match.group(2)) / 100
+        extracted["E-1 tiered"]["summer"]["offPeak"] = float(e1_match.group(1)) / 100
+        extracted["E-1 tiered"]["winter"] = extracted["E-1 tiered"]["summer"]
 
-    # Iterate through plans and find their specific blocks of text
-    plan_keys = list(plan_markers.keys())
-    for i, key in enumerate(plan_keys):
-        start_marker = plan_markers[key]
-        start_idx = full_text.find(start_marker)
-        
-        if start_idx == -1:
-            print(f"  [Warn] Could not find marker for {key}")
-            continue
-            
-        # The block ends where the next plan starts, or at the end of the file
-        end_idx = len(full_text)
-        if i + 1 < len(plan_keys):
-            next_marker = plan_markers[plan_keys[i+1]]
-            found_next = full_text.find(next_marker)
-            if found_next != -1: end_idx = found_next
-            
-        plan_block = full_text[start_idx:end_idx]
-        
-        # Split block into Summer and Winter
-        summer_idx = plan_block.find("Summer")
-        winter_idx = plan_block.find("Winter")
-        
-        results[key] = {"summer": {}, "winter": {}}
-        
-        # Extract Summer Rates
-        if summer_idx != -1:
-            s_end = winter_idx if winter_idx > summer_idx else len(plan_block)
-            s_rates = extract_rates_from_chunk(plan_block[summer_idx:s_end])
-            if s_rates:
-                results[key]["summer"]["onPeak"] = s_rates[0] # Highest
-                if len(s_rates) >= 2: results[key]["summer"]["offPeak"] = s_rates[1]
-                if len(s_rates) >= 3: results[key]["summer"]["superOffPeak"] = s_rates[-1] # Lowest
+    # 2. E-TOU-C Logic (Peak 4-9)
+    # Sequence in text: 40¢ ... 32¢ 44¢ 32¢ (Summer) / 37¢ ... 29¢ 32¢ 29¢ (Winter)
+    # We take the "Above Baseline" rates (44/32 and 32/29)
+    etc_s = re.search(r"E-TOU-C.*?Summer Season.*?(\d+)¢.*?(\d+)¢ (\d+)¢ (\d+)¢", text)
+    if etc_s:
+        extracted["E-TOU-C"]["summer"]["onPeak"] = float(etc_s.group(3)) / 100 # 44
+        extracted["E-TOU-C"]["summer"]["offPeak"] = float(etc_s.group(4)) / 100 # 32
+    
+    etc_w = re.search(r"Winter Season Oct 1–May 31 (\d+)¢.*?(\d+)¢ (\d+)¢ (\d+)¢", text)
+    if etc_w:
+        extracted["E-TOU-C"]["winter"]["onPeak"] = float(etc_w.group(3)) / 100 # 32
+        extracted["E-TOU-C"]["winter"]["offPeak"] = float(etc_w.group(4)) / 100 # 29
 
-        # Extract Winter Rates
-        if winter_idx != -1:
-            w_start = winter_idx
-            w_rates = extract_rates_from_chunk(plan_block[w_start:])
-            if w_rates:
-                results[key]["winter"]["onPeak"] = w_rates[0]
-                if len(w_rates) >= 2: results[key]["winter"]["offPeak"] = w_rates[1]
-                if len(w_rates) >= 3: results[key]["winter"]["superOffPeak"] = w_rates[-1]
+    # 3. E-TOU-D Logic (Peak 5-8)
+    # Sequence: 52¢ 40¢ 34¢ 48¢ 34¢ (Summer) -> [Peak Above, Peak Below, Off]
+    etd_s = re.search(r"E-TOU-D.*?Summer Season.*?(\d+)¢ (\d+)¢ (\d+)¢", text)
+    if etd_s:
+        extracted["E-TOU-D"]["summer"]["onPeak"] = float(etd_s.group(1)) / 100 # 52
+        extracted["E-TOU-D"]["summer"]["offPeak"] = float(etd_s.group(3)) / 100 # 34
+    
+    etd_w = re.search(r"E-TOU-D.*?Winter Season.*?(\d+)¢ (\d+)¢ (\d+)¢", text)
+    if etd_w:
+        extracted["E-TOU-D"]["winter"]["onPeak"] = float(etd_w.group(2)) / 100 # 39
+        extracted["E-TOU-D"]["winter"]["offPeak"] = float(etd_w.group(1)) / 100 # 35
 
-    return results
+    # 4. E-ELEC Logic
+    # Sequence: 55¢ 33¢ 39¢ (Summer) / 32¢ 28¢ 30¢ (Winter)
+    elec_s = re.search(r"E-ELEC.*?Summer Season.*?(\d+)¢ (\d+)¢ (\d+)¢", text)
+    if elec_s:
+        extracted["E-ELEC"]["summer"]["onPeak"] = float(elec_s.group(1)) / 100 # 55
+        extracted["E-ELEC"]["summer"]["offPeak"] = float(elec_s.group(3)) / 100 # 39 (Partial)
+        extracted["E-ELEC"]["summer"]["superOffPeak"] = float(elec_s.group(2)) / 100 # 33
+        
+    elec_w = re.search(r"E-ELEC.*?Winter Season.*?(\d+)¢ (\d+)¢ (\d+)¢", text)
+    if elec_w:
+        extracted["E-ELEC"]["winter"]["onPeak"] = float(elec_w.group(1)) / 100 # 32
+        extracted["E-ELEC"]["winter"]["offPeak"] = float(elec_w.group(3)) / 100 # 30
+        extracted["E-ELEC"]["winter"]["superOffPeak"] = float(elec_w.group(2)) / 100 # 28
+
+    # 5. EV2-A and EV-B Logic (Interleaved Sequence)
+    # The text dump shows: "23¢ 43¢ 54¢ 26¢ 38¢ 38¢ 62¢"
+    ev_s = re.search(r"EV2-A.*?EV-B.*?Summer.*?Summer.*?(\d+)¢ (\d+)¢ (\d+)¢ (\d+)¢ (\d+)¢ (\d+)¢ (\d+)¢", text)
+    if ev_s:
+        extracted["EV2-A"]["summer"] = {"superOffPeak": float(ev_s.group(1))/100, "offPeak": float(ev_s.group(2))/100, "onPeak": float(ev_s.group(3))/100}
+        extracted["EV-B"]["summer"] = {"superOffPeak": float(ev_s.group(4))/100, "offPeak": float(ev_s.group(5))/100, "onPeak": float(ev_s.group(7))/100}
+
+    ev_w = re.search(r"EV2-A.*?EV-B.*?Winter.*?Winter.*?(\d+)¢ (\d+)¢ (\d+)¢ (\d+)¢ (\d+)¢ (\d+)¢ (\d+)¢", text)
+    if ev_w:
+        extracted["EV2-A"]["winter"] = {"superOffPeak": float(ev_w.group(1))/100, "offPeak": float(ev_w.group(2))/100, "onPeak": float(ev_w.group(3))/100}
+        extracted["EV-B"]["winter"] = {"superOffPeak": float(ev_w.group(4))/100, "offPeak": float(ev_w.group(5))/100, "onPeak": float(ev_w.group(7))/100}
+
+    return extracted
 
 def main():
     parser = argparse.ArgumentParser()
@@ -105,10 +113,6 @@ def main():
     download_pdf(PGE_URL, tmp_pdf)
     new_data = parse_pge_marketing_pdf(tmp_pdf)
     
-    if not os.path.exists(JSON_FILE):
-        print(f"[Error] {JSON_FILE} not found.")
-        return
-
     with open(JSON_FILE, 'r') as f:
         current_json = json.load(f)
 
@@ -117,24 +121,18 @@ def main():
     
     for plan, seasons in new_data.items():
         if plan not in current_json["plans"]: continue
-        
         for season in ["summer", "winter"]:
-            # Standardizing bins to check against JSON
-            bins_to_check = ["onPeak", "offPeak", "superOffPeak"]
-            
-            for b_type in bins_to_check:
+            for b_type in ["onPeak", "offPeak", "superOffPeak"]:
                 rate = seasons[season].get(b_type, 0)
                 if rate == 0: continue
                 
                 current_val = current_json["plans"][plan][season].get(b_type, 0)
                 diff = abs(rate - current_val)
-                
                 status = "[MATCH]" if diff < 0.00001 else "[CHANGE DETECTED]"
-                print(f"  {status} {plan:12} ({season:6} {b_type:12}): JSON=${current_val:.5f} | PDF=${rate:.5f} | Delta=${diff:.5f}")
+                
+                print(f"  {status} {plan:12} ({season:6} {b_type:12}): JSON=${current_val:.5f} | PDF=${rate:.5f}")
 
-                # Threshold: Marketing PDF only has 2-decimal precision (cents).
-                # We only update if the difference is more than 1 cent to avoid 
-                # overwriting high-precision manual data with rounded marketing data.
+                # Using 0.01 threshold to protect precision data
                 if diff > 0.01: 
                     current_json["plans"][plan][season][b_type] = rate
                     updated = True
@@ -146,9 +144,9 @@ def main():
                 json.dump(current_json, f, indent=2)
             print("\n>>> Result: Changes committed to JSON.")
         else:
-            print("\n>>> Result: Dry Run complete. Changes were found but NOT saved.")
+            print("\n>>> Result: Dry Run complete. Changes were found.")
     else:
-        print("\n>>> Result: No significant changes (Delta > $0.01) detected.")
+        print("\n>>> Result: No significant changes detected.")
 
     if os.path.exists(tmp_pdf): os.remove(tmp_pdf)
 

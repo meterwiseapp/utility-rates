@@ -3,7 +3,7 @@ name: SoCalGas Auto Update
 on:
   schedule:
     # Runs at 12:00 PM (Noon) UTC on the 1st, 2nd, and 3rd of every month
-    - cron: '0 12 1,2,3 * *'
+    - cron: '0 12 2 * *'
   workflow_dispatch: # Allows you to trigger it manually for testing
 
 env:

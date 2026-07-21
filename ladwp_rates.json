@@ -1,57 +1,55 @@
 {
-  "version": 7,
+  "version": 8,
   "utility": "LADWP",
-  "lastUpdated": "2026-07-01 12:37",
+  "lastUpdated": "2026-07-21 16:00",
   "periods": {
-    "janMar": [
-      1,
-      2,
-      3
-    ],
-    "aprMay": [
-      4,
-      5
-    ],
-    "june": [
-      6
-    ],
-    "julSep": [
-      7,
-      8,
-      9
-    ],
-    "octDec": [
-      10,
-      11,
-      12
-    ]
+    "janMar": [1, 2, 3],
+    "aprMay": [4, 5],
+    "june": [6],
+    "julSep": [7, 8, 9],
+    "octDec": [10, 11, 12]
   },
   "electric": {
     "standard": {
       "janMar": {
         "tier1": 0.24771,
         "tier2": 0.3063,
-        "tier3": 0.3063
+        "tier3": 0.3063,
+        "baseTier1": 0.07142,
+        "baseTier2": 0.13001,
+        "baseTier3": 0.13001
       },
       "aprMay": {
         "tier1": 0.24362,
         "tier2": 0.30221,
-        "tier3": 0.30221
+        "tier3": 0.30221,
+        "baseTier1": 0.07142,
+        "baseTier2": 0.13001,
+        "baseTier3": 0.13001
       },
       "june": {
         "tier1": 0.24362,
         "tier2": 0.30221,
-        "tier3": 0.38922
+        "tier3": 0.38922,
+        "baseTier1": 0.07142,
+        "baseTier2": 0.13001,
+        "baseTier3": 0.13001
       },
       "julSep": {
         "tier1": 0.26408,
         "tier2": 0.32267,
-        "tier3": 0.40968
+        "tier3": 0.40968,
+        "baseTier1": 0.07142,
+        "baseTier2": 0.13001,
+        "baseTier3": 0.13001
       },
       "octDec": {
         "tier1": 0.26357,
         "tier2": 0.33597,
-        "tier3": 0.42887
+        "tier3": 0.42887,
+        "baseTier1": 0.07142,
+        "baseTier2": 0.13001,
+        "baseTier3": 0.13001
       }
     },
     "tou": {

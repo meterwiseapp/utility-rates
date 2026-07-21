@@ -79,6 +79,26 @@ def scrape_section(soup, occurrence, search_text, year_target, pattern_map, is_w
                 break
     return results
 
+def scrape_base_rates(soup):
+    """Locates and scrapes the R-1A Standard Base Rates table."""
+    results = {}
+    for table in soup.find_all('table'):
+        table_text = table.get_text().lower()
+        # Look specifically for the "Energy Charge (Base Rates)" table
+        if "energy charge" in table_text and "base rates" in table_text:
+            print("Scraping LADWP R-1A Base Rates Table...")
+            for row in table.find_all('tr'):
+                row_text = row.get_text(separator=' ', strip=True)
+                for pattern, json_keys in E_PERIOD_MAP.items():
+                    if re.search(pattern, row_text, re.IGNORECASE):
+                        nums = extract_rates(row, 3)
+                        if len(nums) >= 3:
+                            for key in json_keys:
+                                results[key] = nums
+                            print(f"  [Found Base Rate] {pattern} -> {json_keys}: {nums}")
+            break
+    return results
+
 def main():
     dry_run = "--dry-run" in sys.argv
     if dry_run:
@@ -98,6 +118,9 @@ def main():
     r1a_site_data = scrape_section(e_soup := BeautifulSoup(requests.get(ELECTRIC_URL, headers=HEADERS).text, 'html.parser'), 
                                    1, "Total Consumption Charge", year, E_PERIOD_MAP)
 
+    # 1.5. R-1A Base Rates - Dynamic Table scraper (no hardcoding)
+    r1a_base_site_data = scrape_base_rates(e_soup)
+
     # 2. R-1B (TOU) - Second 'Total Consumption' table
     r1b_site_data = scrape_section(e_soup, 2, "Total Consumption Charge", year, E_PERIOD_MAP)
 
@@ -107,16 +130,24 @@ def main():
 
     updated = False
 
-    # Apply Electric R-1A (SAFE INTEGRATION: Preserves existing base rate keys)
+    # Apply Electric R-1A (Dynamic Base Rates integrated)
     for key, rates in r1a_site_data.items():
         existing = data["electric"]["standard"].get(key, {})
+        
+        # Safely read scraped base rates, fallback to existing or default standards
+        base_rates = r1a_base_site_data.get(key, [
+            existing.get("baseTier1", 0.07142),
+            existing.get("baseTier2", 0.13001),
+            existing.get("baseTier3", 0.13001)
+        ])
+        
         new_val = {
             "tier1": rates[0], 
             "tier2": rates[1], 
             "tier3": rates[2],
-            "baseTier1": existing.get("baseTier1", 0.07142),
-            "baseTier2": existing.get("baseTier2", 0.13001),
-            "baseTier3": existing.get("baseTier3", 0.13001)
+            "baseTier1": base_rates[0],
+            "baseTier2": base_rates[1],
+            "baseTier3": base_rates[2]
         }
         if data["electric"]["standard"].get(key) != new_val:
             print(f"  [UPDATE] Electric R-1A {key}")

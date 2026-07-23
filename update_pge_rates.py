@@ -35,32 +35,77 @@ def clean_val(val):
 
 def parse_pge_baseline_allowances(xlsx):
     """
-    Parses daily baseline quantities (kWh/day) for Code B (Basic) and Code H (All-Electric)
+    Parses daily baseline allowances from sheet: ElecBaselineEffec220601-Present
+    Layout: Winter on left (cols 0-3), Summer on right (cols 4-7)
+    Captures 'Individually Metered (Daily)' for Code H (All Elec) and Code B (Basic Elec)
     across territories T, P, R, S, X.
     """
-    print("\n[Excel Scan] Scanning Baseline Quantities Table...")
-    extracted_allowances = {}
+    print("\n[Excel Scan] Scanning Baseline Quantities Sheet...")
+    extracted_allowances = {t: {"summer": {}, "winter": {}} for t in ["T", "P", "R", "S", "X"]}
     territories = ["T", "P", "R", "S", "X"]
-
-    for sheet_name in xlsx.sheet_names:
-        df = xlsx.parse(sheet_name, header=None)
-        for idx, row in df.iterrows():
-            row_str = " ".join([str(i) for i in row.tolist()])
+    
+    # 1. Target the Baseline sheet
+    target_sheet = None
+    for name in xlsx.sheet_names:
+        if "ElecBaseline" in name or "Baseline" in name:
+            target_sheet = name
+            break
             
-            # Check for baseline territory row markers
-            for t in territories:
-                marker = f"Territory {t}"
-                if marker in row_str or f"Code B {t}" in row_str:
-                    nums = [clean_val(cell) for cell in row if clean_val(cell) > 0]
-                    # PG&E standard layout: [Basic Summer, Basic Winter, All-Electric Summer, All-Electric Winter]
-                    if len(nums) >= 4:
-                        extracted_allowances[t] = {
-                            "summer": { "basic": nums[0], "allElectric": nums[2] },
-                            "winter": { "basic": nums[1], "allElectric": nums[3] }
-                        }
-                        print(f"    [Found Baseline] Territory {t}: Summer(Basic={nums[0]}, CodeH={nums[2]}) | Winter(Basic={nums[1]}, CodeH={nums[3]})")
+    if not target_sheet:
+        print("  [Warning] Baseline sheet not found in workbook.")
+        return {}
 
-    return extracted_allowances
+    print(f"  > Target Sheet Found: '{target_sheet}'")
+    df = xlsx.parse(target_sheet, header=None)
+
+    current_code_left = "allElectric"  # Winter default section
+    current_code_right = "allElectric" # Summer default section
+
+    for idx, row in df.iterrows():
+        row_str = " ".join([str(cell) for cell in row.dropna().tolist()])
+        
+        # Section Tracking: Code H (All-Electric) vs Code B (Basic)
+        if "CODE H" in row_str.upper() or "ALL ELEC" in row_str.upper():
+            current_code_left = "allElectric"
+            current_code_right = "allElectric"
+        elif "CODE B" in row_str.upper() or "BASIC ELEC" in row_str.upper():
+            current_code_left = "basic"
+            current_code_right = "basic"
+
+        # Scan row cells for Territory letters
+        for col_idx, cell in enumerate(row):
+            cell_str = str(cell).strip().upper()
+            
+            # Match standalone territory letter (T, P, R, S, X)
+            t_match = None
+            if cell_str in territories:
+                t_match = cell_str
+            elif cell_str.startswith("TERRITORY "):
+                t = cell_str.replace("TERRITORY ", "").strip()
+                if t in territories: t_match = t
+
+            if t_match:
+                # Look for the first positive numeric value to the right (Individually Metered Daily)
+                numeric_vals = []
+                for val_idx in range(col_idx + 1, min(col_idx + 4, len(row))):
+                    v = clean_val(row.iloc[val_idx])
+                    if v > 0:
+                        numeric_vals.append(v)
+                
+                if numeric_vals:
+                    individually_metered_val = numeric_vals[0]
+                    is_summer_side = col_idx >= 4  # Right 4 columns = Summer
+                    
+                    season = "summer" if is_summer_side else "winter"
+                    code_type = current_code_right if is_summer_side else current_code_left
+                    
+                    extracted_allowances[t_match][season][code_type] = individually_metered_val
+                    print(f"    [Captured] Territory {t_match} ({season:6} - {code_type:11}): {individually_metered_val} kWh/day")
+
+    # Filter out empty structures
+    valid_result = {t: data for t, data in extracted_allowances.items() 
+                    if "basic" in data["summer"] or "allElectric" in data["summer"]}
+    return valid_result
 
 def parse_pge_xlsx(file_path):
     print(f"\n[Excel Scan] Processing workbook...")
@@ -146,7 +191,7 @@ def parse_pge_xlsx(file_path):
                         b_val = clean_val(row.iloc[10])
                         if b_val < 0: baseline_credit_found = abs(b_val)
 
-    # Scrape baseline quantities table
+    # Extract Baseline Allowances
     extracted_allowances = parse_pge_baseline_allowances(xlsx)
 
     return extracted_data, baseline_credit_found, extracted_allowances
@@ -213,7 +258,7 @@ def main():
                         if val > 0:
                             curr_val = current_json["baselineAllowances"][t].get(season, {}).get(code, 0)
                             if abs(val - curr_val) > 0.01:
-                                print(f"  [CHANGE] Territory {t} ({season} {code}): {curr_val} -> {val} kWh/day")
+                                print(f"  [CHANGE] Territory {t} ({season:6} {code:11}): {curr_val} -> {val} kWh/day")
                                 if not args.dry_run:
                                     current_json["baselineAllowances"][t][season][code] = val
                                 updated = True

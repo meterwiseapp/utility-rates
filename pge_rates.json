@@ -3,6 +3,28 @@
   "nbcRate": 0.02091,
   "baselineCredit": 0.08140,
   "sbpExportRate": 0.07500,
+  "baselineAllowances": {
+    "T": {
+      "summer": { "basic": 7.0, "allElectric": 8.8 },
+      "winter": { "basic": 7.7, "allElectric": 18.2 }
+    },
+    "P": {
+      "summer": { "basic": 13.5, "allElectric": 15.2 },
+      "winter": { "basic": 11.0, "allElectric": 26.0 }
+    },
+    "R": {
+      "summer": { "basic": 18.1, "allElectric": 22.1 },
+      "winter": { "basic": 11.0, "allElectric": 28.5 }
+    },
+    "S": {
+      "summer": { "basic": 16.5, "allElectric": 18.8 },
+      "winter": { "basic": 12.3, "allElectric": 32.1 }
+    },
+    "X": {
+      "summer": { "basic": 10.1, "allElectric": 11.5 },
+      "winter": { "basic": 11.0, "allElectric": 20.2 }
+    }
+  },
   "plans": {
     "E-1 tiered": {
       "summer": { "onPeak": 0.40702, "offPeak": 0.32561, "superOffPeak": 0.0 },

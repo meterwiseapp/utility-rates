@@ -33,14 +33,41 @@ def clean_val(val):
     except:
         return 0.0
 
+def parse_pge_baseline_allowances(xlsx):
+    """
+    Parses daily baseline quantities (kWh/day) for Code B (Basic) and Code H (All-Electric)
+    across territories T, P, R, S, X.
+    """
+    print("\n[Excel Scan] Scanning Baseline Quantities Table...")
+    extracted_allowances = {}
+    territories = ["T", "P", "R", "S", "X"]
+
+    for sheet_name in xlsx.sheet_names:
+        df = xlsx.parse(sheet_name, header=None)
+        for idx, row in df.iterrows():
+            row_str = " ".join([str(i) for i in row.tolist()])
+            
+            # Check for baseline territory row markers
+            for t in territories:
+                marker = f"Territory {t}"
+                if marker in row_str or f"Code B {t}" in row_str:
+                    nums = [clean_val(cell) for cell in row if clean_val(cell) > 0]
+                    # PG&E standard layout: [Basic Summer, Basic Winter, All-Electric Summer, All-Electric Winter]
+                    if len(nums) >= 4:
+                        extracted_allowances[t] = {
+                            "summer": { "basic": nums[0], "allElectric": nums[2] },
+                            "winter": { "basic": nums[1], "allElectric": nums[3] }
+                        }
+                        print(f"    [Found Baseline] Territory {t}: Summer(Basic={nums[0]}, CodeH={nums[2]}) | Winter(Basic={nums[1]}, CodeH={nums[3]})")
+
+    return extracted_allowances
+
 def parse_pge_xlsx(file_path):
     print(f"\n[Excel Scan] Processing workbook...")
     xlsx = pd.ExcelFile(file_path)
     extracted_data = {}
     baseline_credit_found = None
 
-    # We map JSON IDs to very specific substrings expected in the FIRST COLUMN (Index 0)
-    # This prevents description text from accidentally triggering a plan change.
     plan_identities = {
         "E-1 tiered": ["Residential Schedules", "E1,"],
         "E-TOU-C": ["Rate Schedule E-TOU-C"],
@@ -50,7 +77,6 @@ def parse_pge_xlsx(file_path):
         "EV-B": ["EV, Rate B"]
     }
     
-    # If the first column contains any of these, we STOP tracking the current plan
     exclusion_markers = ["EM", "EM-TOU", "ES,", "ET,", "Master"]
 
     for sheet_name in xlsx.sheet_names:
@@ -61,15 +87,12 @@ def parse_pge_xlsx(file_path):
         current_season = "summer"
 
         for idx, row in df.iterrows():
-            # Identify the lead cell (Column A)
             first_cell = str(row.iloc[0]).strip()
             row_str = " ".join([str(i) for i in row.tolist()])
             
-            # 1. IDENTIFY PLAN START (Look only at the first column)
             found_anchor = False
             for json_id, markers in plan_identities.items():
                 if any(m in first_cell for m in markers):
-                    # SAFETY: Ensure it's not a master metered version (EM)
                     if not any(ex in first_cell for ex in exclusion_markers) or "E1" in first_cell:
                         current_plan_id = json_id
                         found_anchor = True
@@ -78,7 +101,6 @@ def parse_pge_xlsx(file_path):
                         print(f"    [Found] {json_id} block start (Row {idx})")
                         break
             
-            # 2. BOUNDARY CHECK: If this row is a different plan type (like EM), stop collecting
             if not found_anchor and any(ex in first_cell for ex in exclusion_markers) and "E1" not in first_cell:
                 if current_plan_id:
                     print(f"    [Boundary] Stopping data collection at row {idx} due to non-residential marker: {first_cell}")
@@ -87,11 +109,9 @@ def parse_pge_xlsx(file_path):
 
             if not current_plan_id: continue
 
-            # 3. SEASON CONTEXT
             if "Summer" in row_str: current_season = "summer"
             elif "Winter" in row_str: current_season = "winter"
 
-            # 4. CAPTURE E-1 DATA (Standard Table: Col 8 and 9)
             if current_plan_id == "E-1 tiered":
                 if "Tiered Energy Charges" in row_str:
                     t1 = clean_val(row.iloc[8])
@@ -102,7 +122,6 @@ def parse_pge_xlsx(file_path):
                         print(f"      -> Captured Res E-1: T1={t1}, T2={t2}")
                 continue
 
-            # 5. CAPTURE TOU DATA (Column mapping varies by Table type)
             is_ev_tech = any(x in current_plan_id for x in ["EV", "ELEC"])
             period_col = 7 if is_ev_tech else 8
             rate_col = 8 if is_ev_tech else 9
@@ -123,12 +142,14 @@ def parse_pge_xlsx(file_path):
                         
                         print(f"      -> {current_plan_id} {current_season} {period_cell}: {rate}")
 
-                    # 6. CAPTURE BASELINE CREDIT (Specifically from Res E-TOU-C)
                     if current_plan_id == "E-TOU-C" and len(row) > 10:
                         b_val = clean_val(row.iloc[10])
                         if b_val < 0: baseline_credit_found = abs(b_val)
 
-    return extracted_data, baseline_credit_found
+    # Scrape baseline quantities table
+    extracted_allowances = parse_pge_baseline_allowances(xlsx)
+
+    return extracted_data, baseline_credit_found, extracted_allowances
 
 def cleanup_bins(data):
     two_tier_plans = ["E-1 tiered", "E-TOU-C", "E-TOU-D"]
@@ -150,7 +171,7 @@ def main():
     download_xlsx(XLSX_URL, tmp_xlsx)
     
     try:
-        new_data, b_credit = parse_pge_xlsx(tmp_xlsx)
+        new_data, b_credit, new_allowances = parse_pge_xlsx(tmp_xlsx)
         new_data = cleanup_bins(new_data)
     except Exception as e:
         print(f"[Error] Parser Failure: {e}")
@@ -167,6 +188,7 @@ def main():
     print("\n[Comparison Ledger: JSON vs Excel]")
     updated = False
     
+    # 1. Update Global Baseline Credit
     if b_credit:
         old_bc = current_json.get("baselineCredit", 0)
         if abs(b_credit - old_bc) > 0.0001:
@@ -174,6 +196,29 @@ def main():
             if not args.dry_run: current_json["baselineCredit"] = b_credit
             updated = True
 
+    # 2. Update Baseline Allowances Table
+    if new_allowances:
+        if "baselineAllowances" not in current_json:
+            current_json["baselineAllowances"] = {}
+        
+        for t, seasons in new_allowances.items():
+            if t not in current_json["baselineAllowances"]:
+                current_json["baselineAllowances"][t] = seasons
+                updated = True
+                print(f"  [NEW] Added Baseline Territory {t} to JSON")
+            else:
+                for season in ["summer", "winter"]:
+                    for code in ["basic", "allElectric"]:
+                        val = seasons.get(season, {}).get(code, 0)
+                        if val > 0:
+                            curr_val = current_json["baselineAllowances"][t].get(season, {}).get(code, 0)
+                            if abs(val - curr_val) > 0.01:
+                                print(f"  [CHANGE] Territory {t} ({season} {code}): {curr_val} -> {val} kWh/day")
+                                if not args.dry_run:
+                                    current_json["baselineAllowances"][t][season][code] = val
+                                updated = True
+
+    # 3. Update Plan Rates
     for plan in ["E-1 tiered", "E-TOU-C", "E-TOU-D", "E-ELEC", "EV2-A", "EV-B"]:
         if plan not in new_data: continue
         for season in ["summer", "winter"]:

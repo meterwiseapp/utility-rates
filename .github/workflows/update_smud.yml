@@ -41,6 +41,10 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          TODAY=$(date -u +"%Y-%m-%d")
+          jq --arg d "$TODAY" '.lastUpdated = $d' rates/smud_rates.json > tmp.json && mv tmp.json rates/smud_rates.json
+          
           git add rates/smud_rates.json
           if git diff --staged --quiet; then
             echo "No changes detected in SMUD rates."

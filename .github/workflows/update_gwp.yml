@@ -38,6 +38,10 @@ jobs:
         run: |
           git config --global user.name 'GWP-Bot'
           git config --global user.email 'bot@utilityestimator.com'
+
+          TODAY=$(date -u +"%Y-%m-%d")
+          jq --arg d "$TODAY" '.lastUpdated = $d' rates/gwp_rates.json > tmp.json && mv tmp.json rates/gwp_rates.json
+          
           git add rates/gwp_rates.json
           git commit -m "Automated GWP rate update: $(date)" || exit 0
           git push

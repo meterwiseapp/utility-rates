@@ -42,6 +42,10 @@ jobs:
         run: |
           git config --global user.name 'SDGE-Bot'
           git config --global user.email 'bot@utilityestimator.com'
+
+          TODAY=$(date -u +"%Y-%m-%d")
+          jq --arg d "$TODAY" '.lastUpdated = $d' rates/sdge_rates.json > tmp.json && mv tmp.json rates/sdge_rates.json
+          
           git add rates/sdge_rates.json
           cp rates/sdge_rates.json sdge_rates.json || true
           git add sdge_rates.json

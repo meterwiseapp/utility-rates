@@ -40,6 +40,10 @@ jobs:
         run: |
           git config --global user.name 'PWP-Bot'
           git config --global user.email 'bot@utilityestimator.com'
+
+          TODAY=$(date -u +"%Y-%m-%d")
+          jq --arg d "$TODAY" '.lastUpdated = $d' rates/pwp_rates.json > tmp.json && mv tmp.json rates/pwp_rates.json
+          
           git add rates/pwp_rates.json
           # Commit only if there are changes; '|| exit 0' prevents failure if no changes
           git commit -m "Automated PWP rate update: $(date)" || exit 0

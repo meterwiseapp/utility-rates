@@ -40,9 +40,16 @@ jobs:
         run: |
           git config --global user.name 'LADWP-Bot'
           git config --global user.email 'bot@utilityestimator.com'
+
+          # 1. Stamp today's date (YYYY-MM-DD) into lastUpdated regardless of rate changes
+          TODAY=$(date -u +"%Y-%m-%d")
+          jq --arg d "$TODAY" '.lastUpdated = $d' rates/ladwp_rates.json > tmp.json && mv tmp.json rates/ladwp_rates.json
+
+          # 2. Stage both file locations
           git add rates/ladwp_rates.json
           cp rates/ladwp_rates.json ladwp_rates.json || true
           git add ladwp_rates.json
-          # Commit only if there are changes; '|| exit 0' prevents failure if no changes
-          git commit -m "Automated rate update: $(date)" || exit 0
+
+          # 3. Commit will now always succeed because lastUpdated was refreshed
+          git commit -m "Automated rate update: ${TODAY}" || exit 0
           git push

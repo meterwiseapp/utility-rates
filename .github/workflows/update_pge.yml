@@ -43,6 +43,10 @@ jobs:
         run: |
           git config --global user.name 'PGE-Bot'
           git config --global user.email 'bot@meterwise.pro'
+
+          TODAY=$(date -u +"%Y-%m-%d")
+          jq --arg d "$TODAY" '.lastUpdated = $d' rates/pge_rates.json > tmp.json && mv tmp.json rates/pge_rates.json
+          
           git add rates/pge_rates.json
           cp rates/pge_rates.json pge_rates.json || true
           git add pge_rates.json

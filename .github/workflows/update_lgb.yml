@@ -40,6 +40,10 @@ jobs:
         run: |
           git config --global user.name 'LongBeach-Bot'
           git config --global user.email 'bot@utilityestimator.com'
+
+          TODAY=$(date -u +"%Y-%m-%d")
+          jq --arg d "$TODAY" '.lastUpdated = $d' rates/longbeach_rates.json > tmp.json && mv tmp.json rates/longbeach_rates.json
+          
           git add rates/longbeach_rates.json
           cp rates/longbeach_rates.json longbeach_rates.json || true
           git add longbeach_rates.json

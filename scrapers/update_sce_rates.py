@@ -311,7 +311,7 @@ def print_comparison_table(existing_data, scraped_data, is_dry_run):
     updated_count = 0
     warning_count = 0
 
-for r in records:
+    for r in records:
         delta_str = f"{r.delta:+.5f}" if abs(r.delta) >= 0.00001 else "$0.00000"
         
         if r.status == "NEW ENTRY":
@@ -333,7 +333,6 @@ for r in records:
     print("=" * 94)
     mode_text = "[DRY RUN: NO FILES MODIFIED]" if is_dry_run else "[COMMITTED TO DISK]"
     print(f"Summary: {len(records)} Total Audited | {updated_count} Changed | {warning_count} Warnings | {mode_text}\n")
-
 
 def main():
     parser = argparse.ArgumentParser(description="Update SCE and CCA rates JSON")

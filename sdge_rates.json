@@ -1,12 +1,12 @@
 {
-  "lastUpdated": "2026-09-01 16:27",
+  "lastUpdated": "2026-10-01",
   "nbcRate": 0.00591,
   "baselineCredit": 0.10892,
   "minimumBillDaily": 0.384,
-  "sbpExportRate": 0.11613,
-  "sbpDeliveryExportRate": 0.02548,
-  "sbpGenerationExportRate": 0.09065,
-  "nscRate": 0.01306,
+  "sbpExportRate": 0.09483,
+  "sbpDeliveryExportRate": 0.0387,
+  "sbpGenerationExportRate": 0.05613,
+  "nscRate": 0.02749,
   "plans": {
     "TOU-DR1": {
       "hasBaseline": true,

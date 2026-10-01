@@ -1,61 +1,133 @@
 {
-  "lastUpdated": "2026-09-04 12:00",
-  "nbcRate": 0.02154,
-  "baselineCredit": 0.08140,
-  "sbpExportRate": 0.07500,
-  "nscRate": 0.03200,
+  "lastUpdated": "2026-10-01",
+  "nbcRate": 0.020909999999999998,
+  "baselineCredit": 0.0814,
+  "sbpExportRate": 0.075,
+  "nscRate": 0.032,
   "fixed": {
-    "baseServiceStandard": 0.80500,
-    "baseServiceFERA": 0.40000,
-    "baseServiceCARE": 0.20000,
-    "evbMeterCharge": 0.41300
+    "baseServiceStandard": 0.805,
+    "baseServiceFERA": 0.4,
+    "baseServiceCARE": 0.2,
+    "evbMeterCharge": 0.413
   },
   "baselineAllowances": {
     "T": {
-      "summer": { "basic": 6.5, "allElectric": 7.1 },
-      "winter": { "basic": 7.5, "allElectric": 12.9 }
+      "summer": {
+        "basic": 6.5,
+        "allElectric": 7.1
+      },
+      "winter": {
+        "basic": 7.5,
+        "allElectric": 12.9
+      }
     },
     "P": {
-      "summer": { "basic": 13.5, "allElectric": 15.2 },
-      "winter": { "basic": 11.0, "allElectric": 26.0 }
+      "summer": {
+        "basic": 13.5,
+        "allElectric": 15.2
+      },
+      "winter": {
+        "basic": 11.0,
+        "allElectric": 26.0
+      }
     },
     "R": {
-      "summer": { "basic": 17.7, "allElectric": 19.9 },
-      "winter": { "basic": 10.4, "allElectric": 26.7 }
+      "summer": {
+        "basic": 17.7,
+        "allElectric": 19.9
+      },
+      "winter": {
+        "basic": 10.4,
+        "allElectric": 26.7
+      }
     },
     "S": {
-      "summer": { "basic": 15.0, "allElectric": 17.8 },
-      "winter": { "basic": 10.2, "allElectric": 23.7 }
+      "summer": {
+        "basic": 15.0,
+        "allElectric": 17.8
+      },
+      "winter": {
+        "basic": 10.2,
+        "allElectric": 23.7
+      }
     },
     "X": {
-      "summer": { "basic": 9.8, "allElectric": 8.5 },
-      "winter": { "basic": 9.7, "allElectric": 14.6 }
+      "summer": {
+        "basic": 9.8,
+        "allElectric": 8.5
+      },
+      "winter": {
+        "basic": 9.7,
+        "allElectric": 14.6
+      }
     }
   },
   "plans": {
     "E-TOU-C": {
-      "summer": { "onPeak": 0.52240, "offPeak": 0.39940 },
-      "winter": { "onPeak": 0.39757, "offPeak": 0.36757 }
+      "summer": {
+        "onPeak": 0.5224,
+        "offPeak": 0.3994
+      },
+      "winter": {
+        "onPeak": 0.39757,
+        "offPeak": 0.36757
+      }
     },
     "E-TOU-D": {
-      "summer": { "onPeak": 0.47708, "offPeak": 0.34212 },
-      "winter": { "onPeak": 0.38747, "offPeak": 0.34886 }
+      "summer": {
+        "onPeak": 0.47708,
+        "offPeak": 0.34212
+      },
+      "winter": {
+        "onPeak": 0.38747,
+        "offPeak": 0.34886
+      }
     },
     "E-ELEC": {
-      "summer": { "onPeak": 0.55214, "offPeak": 0.39026, "superOffPeak": 0.33358 },
-      "winter": { "onPeak": 0.32063, "offPeak": 0.29854, "superOffPeak": 0.28468 }
+      "summer": {
+        "onPeak": 0.55214,
+        "offPeak": 0.39026,
+        "superOffPeak": 0.33358
+      },
+      "winter": {
+        "onPeak": 0.32063,
+        "offPeak": 0.29854,
+        "superOffPeak": 0.28468
+      }
     },
     "EV2-A": {
-      "summer": { "onPeak": 0.53809, "offPeak": 0.42760, "superOffPeak": 0.22558 },
-      "winter": { "onPeak": 0.41099, "offPeak": 0.39428, "superOffPeak": 0.22558 }
+      "summer": {
+        "onPeak": 0.53809,
+        "offPeak": 0.4276,
+        "superOffPeak": 0.22558
+      },
+      "winter": {
+        "onPeak": 0.41099,
+        "offPeak": 0.39428,
+        "superOffPeak": 0.22558
+      }
     },
     "EV-B": {
-      "summer": { "onPeak": 0.62131, "offPeak": 0.37720, "superOffPeak": 0.26465 },
-      "winter": { "onPeak": 0.43878, "offPeak": 0.30677, "superOffPeak": 0.23504 }
+      "summer": {
+        "onPeak": 0.62131,
+        "offPeak": 0.3772,
+        "superOffPeak": 0.26465
+      },
+      "winter": {
+        "onPeak": 0.43878,
+        "offPeak": 0.30677,
+        "superOffPeak": 0.23504
+      }
     },
     "E-1 tiered": {
-      "summer": { "onPeak": 0.40702, "offPeak": 0.32561 },
-      "winter": { "onPeak": 0.40702, "offPeak": 0.32561 }
+      "summer": {
+        "onPeak": 0.40702,
+        "offPeak": 0.32561
+      },
+      "winter": {
+        "onPeak": 0.40702,
+        "offPeak": 0.32561
+      }
     }
   },
   "gas": {
@@ -73,111 +145,210 @@
     "CLEANPOWERSF": {
       "name": "CleanPowerSF",
       "fullName": "CleanPowerSF (San Francisco)",
-      "pciaRate": 0.0150,
+      "pciaRate": 0.015,
       "tiers": {
-        "supergreen": { "name": "SuperGreen (100%)", "rateAdder": 0.0200 },
-        "green": { "name": "Green (50%)", "rateAdder": -0.0050 },
-        "optOut": { "name": "Opted Out (100% PG&E)", "rateAdder": 0.0 }
+        "supergreen": {
+          "name": "SuperGreen (100%)",
+          "rateAdder": 0.02
+        },
+        "green": {
+          "name": "Green (50%)",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
       }
     },
     "AVA": {
       "name": "Ava Community Energy",
       "fullName": "Ava Community Energy (East Bay / Alameda)",
-      "pciaRate": 0.0150,
+      "pciaRate": 0.015,
       "tiers": {
-        "renewable100": { "name": "Renewable 100", "rateAdder": 0.0150 },
-        "bright_choice": { "name": "Bright Choice", "rateAdder": -0.0075 },
-        "optOut": { "name": "Opted Out (100% PG&E)", "rateAdder": 0.0 }
+        "renewable100": {
+          "name": "Renewable 100",
+          "rateAdder": 0.015
+        },
+        "bright_choice": {
+          "name": "Bright Choice",
+          "rateAdder": -0.0075
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
       }
     },
     "PCE": {
       "name": "Peninsula Clean Energy",
       "fullName": "Peninsula Clean Energy (San Mateo County)",
-      "pciaRate": 0.0150,
+      "pciaRate": 0.015,
       "tiers": {
-        "ecogreen": { "name": "ECO100 (100% Renewable)", "rateAdder": 0.0100 },
-        "ecoplus": { "name": "ECOplus (50% Renewable)", "rateAdder": -0.0100 },
-        "optOut": { "name": "Opted Out (100% PG&E)", "rateAdder": 0.0 }
+        "ecogreen": {
+          "name": "ECO100 (100% Renewable)",
+          "rateAdder": 0.01
+        },
+        "ecoplus": {
+          "name": "ECOplus (50% Renewable)",
+          "rateAdder": -0.01
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
       }
     },
     "MCE": {
       "name": "MCE Clean Energy",
       "fullName": "MCE (Marin, Napa, Solano, Contra Costa)",
-      "pciaRate": 0.0150,
+      "pciaRate": 0.015,
       "tiers": {
-        "deep_green": { "name": "Deep Green (100%)", "rateAdder": 0.0150 },
-        "light_green": { "name": "Light Green (60%)", "rateAdder": 0.0 },
-        "optOut": { "name": "Opted Out (100% PG&E)", "rateAdder": 0.0 }
+        "deep_green": {
+          "name": "Deep Green (100%)",
+          "rateAdder": 0.015
+        },
+        "light_green": {
+          "name": "Light Green (60%)",
+          "rateAdder": 0.0
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
       }
     },
     "SVCE": {
       "name": "Silicon Valley Clean Energy",
       "fullName": "Silicon Valley Clean Energy (Santa Clara County)",
-      "pciaRate": 0.0150,
+      "pciaRate": 0.015,
       "tiers": {
-        "greenprime": { "name": "GreenPrime (100%)", "rateAdder": 0.0150 },
-        "greenstart": { "name": "GreenStart (Standard)", "rateAdder": 0.0 },
-        "optOut": { "name": "Opted Out (100% PG&E)", "rateAdder": 0.0 }
+        "greenprime": {
+          "name": "GreenPrime (100%)",
+          "rateAdder": 0.015
+        },
+        "greenstart": {
+          "name": "GreenStart (Standard)",
+          "rateAdder": 0.0
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
       }
     },
     "SJCE": {
       "name": "San Jose Clean Energy",
       "fullName": "San Jose Clean Energy (City of San Jose)",
-      "pciaRate": 0.0150,
+      "pciaRate": 0.015,
       "tiers": {
-        "totalgreen": { "name": "TotalGreen (100% Renewable)", "rateAdder": 0.0180 },
-        "greensource": { "name": "GreenSource (62% Clean)", "rateAdder": -0.0050 },
-        "optOut": { "name": "Opted Out (100% PG&E)", "rateAdder": 0.0 }
+        "totalgreen": {
+          "name": "TotalGreen (100% Renewable)",
+          "rateAdder": 0.018
+        },
+        "greensource": {
+          "name": "GreenSource (62% Clean)",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
       }
     },
     "3CE_PGE": {
       "name": "Central Coast Energy",
       "fullName": "Central Coast Community Energy (Central Coast)",
-      "pciaRate": 0.0150,
+      "pciaRate": 0.015,
       "tiers": {
-        "3c_prime": { "name": "3Cprime (100% Clean)", "rateAdder": 0.0150 },
-        "3c_choice": { "name": "3Cchoice (Standard)", "rateAdder": -0.0050 },
-        "optOut": { "name": "Opted Out (100% PG&E)", "rateAdder": 0.0 }
+        "3c_prime": {
+          "name": "3Cprime (100% Clean)",
+          "rateAdder": 0.015
+        },
+        "3c_choice": {
+          "name": "3Cchoice (Standard)",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
       }
     },
     "SCP": {
       "name": "Sonoma Clean Power",
       "fullName": "Sonoma Clean Power (Sonoma & Mendocino)",
-      "pciaRate": 0.0150,
+      "pciaRate": 0.015,
       "tiers": {
-        "evergreen": { "name": "Evergreen (100% Local)", "rateAdder": 0.0250 },
-        "cleanstart": { "name": "CleanStart (Default)", "rateAdder": -0.0050 },
-        "optOut": { "name": "Opted Out (100% PG&E)", "rateAdder": 0.0 }
+        "evergreen": {
+          "name": "Evergreen (100% Local)",
+          "rateAdder": 0.025
+        },
+        "cleanstart": {
+          "name": "CleanStart (Default)",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
       }
     },
     "PIONEER": {
       "name": "Pioneer Community Energy",
       "fullName": "Pioneer Community Energy (Placer & El Dorado)",
-      "pciaRate": 0.0150,
+      "pciaRate": 0.015,
       "tiers": {
-        "green100": { "name": "100% Renewable", "rateAdder": 0.0150 },
-        "standard": { "name": "Standard Choice", "rateAdder": -0.0050 },
-        "optOut": { "name": "Opted Out (100% PG&E)", "rateAdder": 0.0 }
+        "green100": {
+          "name": "100% Renewable",
+          "rateAdder": 0.015
+        },
+        "standard": {
+          "name": "Standard Choice",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
       }
     },
     "VCE": {
       "name": "Valley Clean Energy",
       "fullName": "Valley Clean Energy (Yolo County)",
-      "pciaRate": 0.0150,
+      "pciaRate": 0.015,
       "tiers": {
-        "ultragreen": { "name": "UltraGreen (100% Clean)", "rateAdder": 0.0150 },
-        "standardgreen": { "name": "Standard Green", "rateAdder": -0.0050 },
-        "optOut": { "name": "Opted Out (100% PG&E)", "rateAdder": 0.0 }
+        "ultragreen": {
+          "name": "UltraGreen (100% Clean)",
+          "rateAdder": 0.015
+        },
+        "standardgreen": {
+          "name": "Standard Green",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
       }
     },
     "RCEA": {
       "name": "Redwood Coast Energy",
       "fullName": "Redwood Coast Energy Authority (Humboldt County)",
-      "pciaRate": 0.0150,
+      "pciaRate": 0.015,
       "tiers": {
-        "repower_plus": { "name": "REpower+ (100% Renewable)", "rateAdder": 0.0100 },
-        "repower": { "name": "REpower (Standard)", "rateAdder": -0.0050 },
-        "optOut": { "name": "Opted Out (100% PG&E)", "rateAdder": 0.0 }
+        "repower_plus": {
+          "name": "REpower+ (100% Renewable)",
+          "rateAdder": 0.01
+        },
+        "repower": {
+          "name": "REpower (Standard)",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
       }
     }
   }

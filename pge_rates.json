@@ -1,11 +1,11 @@
 {
-  "lastUpdated": "2026-09-01 16:30",
+  "lastUpdated": "2026-10-01",
   "nbcRate": 0.020909999999999998,
   "baselineCredit": 0.0814,
   "sbpExportRate": 0.075,
-  "nscRate": 0.02751,
+  "nscRate": 0.032,
   "fixed": {
-    "baseServiceStandard": 0.8049999999999999,
+    "baseServiceStandard": 0.805,
     "baseServiceFERA": 0.4,
     "baseServiceCARE": 0.2,
     "evbMeterCharge": 0.413
@@ -13,52 +13,52 @@
   "baselineAllowances": {
     "T": {
       "summer": {
-        "allElectric": 7.1,
-        "basic": 6.5
+        "basic": 6.5,
+        "allElectric": 7.1
       },
       "winter": {
-        "allElectric": 12.9,
-        "basic": 7.5
+        "basic": 7.5,
+        "allElectric": 12.9
       }
     },
     "P": {
       "summer": {
-        "allElectric": 15.2,
-        "basic": 13.5
+        "basic": 13.5,
+        "allElectric": 15.2
       },
       "winter": {
-        "allElectric": 26.0,
-        "basic": 11.0
+        "basic": 11.0,
+        "allElectric": 26.0
       }
     },
     "R": {
       "summer": {
-        "allElectric": 19.9,
-        "basic": 17.7
+        "basic": 17.7,
+        "allElectric": 19.9
       },
       "winter": {
-        "allElectric": 26.7,
-        "basic": 10.4
+        "basic": 10.4,
+        "allElectric": 26.7
       }
     },
     "S": {
       "summer": {
-        "allElectric": 17.8,
-        "basic": 15.0
+        "basic": 15.0,
+        "allElectric": 17.8
       },
       "winter": {
-        "allElectric": 23.7,
-        "basic": 10.2
+        "basic": 10.2,
+        "allElectric": 23.7
       }
     },
     "X": {
       "summer": {
-        "allElectric": 8.5,
-        "basic": 9.8
+        "basic": 9.8,
+        "allElectric": 8.5
       },
       "winter": {
-        "allElectric": 14.6,
-        "basic": 9.7
+        "basic": 9.7,
+        "allElectric": 14.6
       }
     }
   },
@@ -107,6 +107,18 @@
         "superOffPeak": 0.22558
       }
     },
+    "EV-B": {
+      "summer": {
+        "onPeak": 0.62131,
+        "offPeak": 0.3772,
+        "superOffPeak": 0.26465
+      },
+      "winter": {
+        "onPeak": 0.43878,
+        "offPeak": 0.30677,
+        "superOffPeak": 0.23504
+      }
+    },
     "E-1 tiered": {
       "summer": {
         "onPeak": 0.40702,
@@ -116,162 +128,6 @@
         "onPeak": 0.40702,
         "offPeak": 0.32561
       }
-    },
-    "EV-B": {
-      "summer": {
-        "onPeak": 0.62131,
-        "offPeak": 0.3772,
-        "superOffPeak": 0.26465
-      },
-      "winter": {
-        "onPeak": 0.43877999999999995,
-        "offPeak": 0.30677,
-        "superOffPeak": 0.23503999999999997
-      }
-    }
-  },
-  "cca": {
-    "SJCE": {
-      "name": "San Jose Clean Energy",
-      "fullName": "San Jose Clean Energy (City of San Jose)",
-      "tiers": {
-        "totalgreen": {
-          "name": "TotalGreen (100% Renewable)",
-          "rateAdder": 0.018
-        },
-        "greensource": {
-          "name": "GreenSource (62% Clean)",
-          "rateAdder": -0.005
-        }
-      }
-    },
-    "3CE_PGE": {
-      "name": "Central Coast Energy",
-      "fullName": "Central Coast Community Energy",
-      "tiers": {
-        "3c_prime": {
-          "name": "3Cprime (100% Clean)",
-          "rateAdder": 0.015
-        },
-        "3c_choice": {
-          "name": "3Cchoice (Standard)",
-          "rateAdder": -0.005
-        }
-      }
-    },
-    "SCP": {
-      "name": "Sonoma Clean Power",
-      "fullName": "Sonoma Clean Power (Sonoma & Mendocino)",
-      "tiers": {
-        "evergreen": {
-          "name": "Evergreen (100% Local)",
-          "rateAdder": 0.025
-        },
-        "cleanstart": {
-          "name": "CleanStart (Default)",
-          "rateAdder": -0.005
-        }
-      }
-    },
-    "CLEANPOWERSF": {
-      "name": "CleanPowerSF",
-      "fullName": "CleanPowerSF (San Francisco)",
-      "tiers": {
-        "supergreen": {
-          "name": "SuperGreen (100%)",
-          "rateAdder": 0.02
-        },
-        "green": {
-          "name": "Green (50%)",
-          "rateAdder": -0.005
-        }
-      }
-    },
-    "AVA": {
-      "name": "Ava Community Energy",
-      "fullName": "Ava Community Energy (East Bay / Alameda)",
-      "tiers": {
-        "renewable100": {
-          "name": "Renewable 100",
-          "rateAdder": 0.015
-        },
-        "bright_choice": {
-          "name": "Bright Choice",
-          "rateAdder": -0.0075
-        }
-      }
-    },
-    "PCE": {
-      "name": "Peninsula Clean Energy",
-      "fullName": "Peninsula Clean Energy (San Mateo County)",
-      "tiers": {
-        "ecogreen": {
-          "name": "ECO100 (100% Renewable)",
-          "rateAdder": 0.01
-        },
-        "ecoplus": {
-          "name": "ECOplus (50% Renewable)",
-          "rateAdder": -0.01
-        }
-      }
-    },
-    "MCE": {
-      "name": "MCE Clean Energy",
-      "fullName": "MCE (Marin, Napa, Solano, Contra Costa)",
-      "tiers": {
-        "deep_green": {
-          "name": "Deep Green (100%)",
-          "rateAdder": 0.015
-        },
-        "light_green": {
-          "name": "Light Green (60%)",
-          "rateAdder": 0.0
-        }
-      }
-    },
-    "SVCE": {
-      "name": "Silicon Valley Clean Energy",
-      "fullName": "Silicon Valley Clean Energy (Santa Clara County)",
-      "tiers": {
-        "greenprime": {
-          "name": "GreenPrime (100%)",
-          "rateAdder": 0.015
-        },
-        "greenstart": {
-          "name": "GreenStart (Standard)",
-          "rateAdder": 0.0
-        }
-      }
-    },
-    "PIONEER": {
-      "name": "Pioneer Community Energy",
-      "fullName": "Pioneer Community Energy (Placer & El Dorado Counties)",
-      "default_tiers": {
-        "green100": 0.015,
-        "standard": -0.005,
-        "optOut": 0.0
-      },
-      "jrc_url": "https://pioneercommunityenergy.org/rates/"
-    },
-    "VCE": {
-      "name": "Valley Clean Energy",
-      "fullName": "Valley Clean Energy (Yolo County)",
-      "default_tiers": {
-        "ultragreen": 0.015,
-        "standardgreen": -0.005,
-        "optOut": 0.0
-      },
-      "jrc_url": "https://valleycleanenergy.org/rates/"
-    },
-    "RCEA": {
-      "name": "Redwood Coast Energy",
-      "fullName": "Redwood Coast Energy Authority (Humboldt County)",
-      "default_tiers": {
-        "repower_plus": 0.01,
-        "repower": -0.005,
-        "optOut": 0.0
-      },
-      "jrc_url": "https://redwoodenergy.org/residential-rates/"
     }
   },
   "gas": {
@@ -281,8 +137,219 @@
       "tier2": 1.58211
     },
     "allowances": {
-      "winter": 1.85,
+      "winter": 1.95,
       "summer": 0.45
+    }
+  },
+  "cca": {
+    "CLEANPOWERSF": {
+      "name": "CleanPowerSF",
+      "fullName": "CleanPowerSF (San Francisco)",
+      "pciaRate": 0.015,
+      "tiers": {
+        "supergreen": {
+          "name": "SuperGreen (100%)",
+          "rateAdder": 0.02
+        },
+        "green": {
+          "name": "Green (50%)",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
+      }
+    },
+    "AVA": {
+      "name": "Ava Community Energy",
+      "fullName": "Ava Community Energy (East Bay / Alameda)",
+      "pciaRate": 0.015,
+      "tiers": {
+        "renewable100": {
+          "name": "Renewable 100",
+          "rateAdder": 0.015
+        },
+        "bright_choice": {
+          "name": "Bright Choice",
+          "rateAdder": -0.0075
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
+      }
+    },
+    "PCE": {
+      "name": "Peninsula Clean Energy",
+      "fullName": "Peninsula Clean Energy (San Mateo County)",
+      "pciaRate": 0.015,
+      "tiers": {
+        "ecogreen": {
+          "name": "ECO100 (100% Renewable)",
+          "rateAdder": 0.01
+        },
+        "ecoplus": {
+          "name": "ECOplus (50% Renewable)",
+          "rateAdder": -0.01
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
+      }
+    },
+    "MCE": {
+      "name": "MCE Clean Energy",
+      "fullName": "MCE (Marin, Napa, Solano, Contra Costa)",
+      "pciaRate": 0.015,
+      "tiers": {
+        "deep_green": {
+          "name": "Deep Green (100%)",
+          "rateAdder": 0.015
+        },
+        "light_green": {
+          "name": "Light Green (60%)",
+          "rateAdder": 0.0
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
+      }
+    },
+    "SVCE": {
+      "name": "Silicon Valley Clean Energy",
+      "fullName": "Silicon Valley Clean Energy (Santa Clara County)",
+      "pciaRate": 0.015,
+      "tiers": {
+        "greenprime": {
+          "name": "GreenPrime (100%)",
+          "rateAdder": 0.015
+        },
+        "greenstart": {
+          "name": "GreenStart (Standard)",
+          "rateAdder": 0.0
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
+      }
+    },
+    "SJCE": {
+      "name": "San Jose Clean Energy",
+      "fullName": "San Jose Clean Energy (City of San Jose)",
+      "pciaRate": 0.015,
+      "tiers": {
+        "totalgreen": {
+          "name": "TotalGreen (100% Renewable)",
+          "rateAdder": 0.018
+        },
+        "greensource": {
+          "name": "GreenSource (62% Clean)",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
+      }
+    },
+    "3CE_PGE": {
+      "name": "Central Coast Energy",
+      "fullName": "Central Coast Community Energy (Central Coast)",
+      "pciaRate": 0.015,
+      "tiers": {
+        "3c_prime": {
+          "name": "3Cprime (100% Clean)",
+          "rateAdder": 0.015
+        },
+        "3c_choice": {
+          "name": "3Cchoice (Standard)",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
+      }
+    },
+    "SCP": {
+      "name": "Sonoma Clean Power",
+      "fullName": "Sonoma Clean Power (Sonoma & Mendocino)",
+      "pciaRate": 0.015,
+      "tiers": {
+        "evergreen": {
+          "name": "Evergreen (100% Local)",
+          "rateAdder": 0.025
+        },
+        "cleanstart": {
+          "name": "CleanStart (Default)",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
+      }
+    },
+    "PIONEER": {
+      "name": "Pioneer Community Energy",
+      "fullName": "Pioneer Community Energy (Placer & El Dorado)",
+      "pciaRate": 0.015,
+      "tiers": {
+        "green100": {
+          "name": "100% Renewable",
+          "rateAdder": 0.015
+        },
+        "standard": {
+          "name": "Standard Choice",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
+      }
+    },
+    "VCE": {
+      "name": "Valley Clean Energy",
+      "fullName": "Valley Clean Energy (Yolo County)",
+      "pciaRate": 0.015,
+      "tiers": {
+        "ultragreen": {
+          "name": "UltraGreen (100% Clean)",
+          "rateAdder": 0.015
+        },
+        "standardgreen": {
+          "name": "Standard Green",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
+      }
+    },
+    "RCEA": {
+      "name": "Redwood Coast Energy",
+      "fullName": "Redwood Coast Energy Authority (Humboldt County)",
+      "pciaRate": 0.015,
+      "tiers": {
+        "repower_plus": {
+          "name": "REpower+ (100% Renewable)",
+          "rateAdder": 0.01
+        },
+        "repower": {
+          "name": "REpower (Standard)",
+          "rateAdder": -0.005
+        },
+        "optOut": {
+          "name": "Opted Out (100% PG&E)",
+          "rateAdder": 0.0
+        }
+      }
     }
   }
 }

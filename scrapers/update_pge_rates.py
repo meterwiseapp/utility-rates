@@ -27,7 +27,7 @@ PGE_CCA_HUB_URL = "https://www.pge.com/en/account/alternate-energy-providers/com
 
 # --- RESOLVE FOLDER PATHS ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if os.path.basename(SCRIPT_DIR) == "scripts":
+if os.path.basename(SCRIPT_DIR) in ["scripts", "scrapers"]:
     ROOT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, ".."))
 else:
     ROOT_DIR = SCRIPT_DIR
@@ -38,6 +38,7 @@ if ROOT_DIR not in sys.path:
 CANDIDATE_PATHS = [
     os.path.join(ROOT_DIR, "rates", "pge_rates.json"),
     os.path.join(ROOT_DIR, "pge_rates.json"),
+    os.path.join(SCRIPT_DIR, "rates", "pge_rates.json"),
     os.path.join(SCRIPT_DIR, "pge_rates.json")
 ]
 

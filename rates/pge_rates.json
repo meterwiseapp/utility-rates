@@ -1,11 +1,11 @@
 {
-  "lastUpdated": "2026-10-01",
+  "lastUpdated": "2026-11-01",
   "nbcRate": 0.020909999999999998,
   "baselineCredit": 0.0814,
   "sbpExportRate": 0.075,
-  "nscRate": 0.032,
+  "nscRate": 0.02781,
   "fixed": {
-    "baseServiceStandard": 0.805,
+    "baseServiceStandard": 0.8049999999999999,
     "baseServiceFERA": 0.4,
     "baseServiceCARE": 0.2,
     "evbMeterCharge": 0.413
@@ -13,52 +13,52 @@
   "baselineAllowances": {
     "T": {
       "summer": {
-        "basic": 6.5,
-        "allElectric": 7.1
+        "allElectric": 7.1,
+        "basic": 6.5
       },
       "winter": {
-        "basic": 7.5,
-        "allElectric": 12.9
+        "allElectric": 12.9,
+        "basic": 7.5
       }
     },
     "P": {
       "summer": {
-        "basic": 13.5,
-        "allElectric": 15.2
+        "allElectric": 15.2,
+        "basic": 13.5
       },
       "winter": {
-        "basic": 11.0,
-        "allElectric": 26.0
+        "allElectric": 26.0,
+        "basic": 11.0
       }
     },
     "R": {
       "summer": {
-        "basic": 17.7,
-        "allElectric": 19.9
+        "allElectric": 19.9,
+        "basic": 17.7
       },
       "winter": {
-        "basic": 10.4,
-        "allElectric": 26.7
+        "allElectric": 26.7,
+        "basic": 10.4
       }
     },
     "S": {
       "summer": {
-        "basic": 15.0,
-        "allElectric": 17.8
+        "allElectric": 17.8,
+        "basic": 15.0
       },
       "winter": {
-        "basic": 10.2,
-        "allElectric": 23.7
+        "allElectric": 23.7,
+        "basic": 10.2
       }
     },
     "X": {
       "summer": {
-        "basic": 9.8,
-        "allElectric": 8.5
+        "allElectric": 8.5,
+        "basic": 9.8
       },
       "winter": {
-        "basic": 9.7,
-        "allElectric": 14.6
+        "allElectric": 14.6,
+        "basic": 9.7
       }
     }
   },
@@ -114,9 +114,9 @@
         "superOffPeak": 0.26465
       },
       "winter": {
-        "onPeak": 0.43878,
+        "onPeak": 0.43877999999999995,
         "offPeak": 0.30677,
-        "superOffPeak": 0.23504
+        "superOffPeak": 0.23503999999999997
       }
     },
     "E-1 tiered": {

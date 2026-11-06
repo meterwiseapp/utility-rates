@@ -1,7 +1,7 @@
 {
-  "version": 9,
+  "version": 10,
   "utility": "LADWP",
-  "lastUpdated": "2026-11-01",
+  "lastUpdated": "2026-11-06",
   "periods": {
     "janMar": [
       1,
@@ -61,9 +61,9 @@
         "baseTier3": 0.21702
       },
       "octDec": {
-        "tier1": 0.26357,
-        "tier2": 0.33597,
-        "tier3": 0.42887,
+        "tier1": 0.27292,
+        "tier2": 0.33151,
+        "tier3": 0.33151,
         "baseTier1": 0.07142,
         "baseTier2": 0.13001,
         "baseTier3": 0.13001
@@ -91,9 +91,9 @@
         "tier3": 0.2654
       },
       "octDec": {
-        "tier1": 0.28876,
-        "tier2": 0.23778,
-        "tier3": 0.21383
+        "tier1": 0.30168,
+        "tier2": 0.30168,
+        "tier3": 0.27814
       }
     },
     "pac": [

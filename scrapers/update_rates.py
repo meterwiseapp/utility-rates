@@ -2,7 +2,7 @@
 """
 LADWP Rate Scraper & Verification Engine
 Fetches residential electric and water rate tables from LADWP.com.
-Outputs a structured change comparison table to verify reasonableness.
+Writes to BOTH 'rates/ladwp_rates.json' and 'ladwp_rates.json' for legacy support.
 """
 
 import sys
@@ -15,25 +15,16 @@ from datetime import datetime
 
 # --- ROBUST PATH RESOLUTION ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-if os.path.basename(SCRIPT_DIR) == "scripts":
+if os.path.basename(SCRIPT_DIR) == "scrapers":
     ROOT_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, ".."))
 else:
     ROOT_DIR = SCRIPT_DIR
 
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
-
-CANDIDATE_PATHS = [
+# The 2 canonical file targets to keep 100% in sync
+TARGET_FILES = [
     os.path.join(ROOT_DIR, "rates", "ladwp_rates.json"),
-    os.path.join(ROOT_DIR, "ladwp_rates.json"),
-    os.path.join(SCRIPT_DIR, "ladwp_rates.json")
+    os.path.join(ROOT_DIR, "ladwp_rates.json")
 ]
-
-OUTPUT_FILE = CANDIDATE_PATHS[0]
-for p in CANDIDATE_PATHS:
-    if os.path.exists(p):
-        OUTPUT_FILE = p
-        break
 
 # --- CONFIGURATION & URLS ---
 ELECTRIC_URL = "https://www.ladwp.com/account/customer-service/electric-rates/residential-rates"
@@ -147,13 +138,14 @@ def scrape_base_rates(soup):
 
 
 def load_existing_json():
-    """Safely loads current JSON file or returns base fallback schema."""
-    if os.path.exists(OUTPUT_FILE):
-        try:
-            with open(OUTPUT_FILE, 'r') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"[WARN] Failed to parse existing JSON: {e}")
+    """Safely loads current JSON file from any valid path or returns base fallback schema."""
+    for p in TARGET_FILES:
+        if os.path.exists(p):
+            try:
+                with open(p, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"[WARN] Failed to parse JSON from {p}: {e}")
             
     return {
         "version": 1,
@@ -206,7 +198,7 @@ def main():
     dry_run = "--dry-run" in sys.argv
     data = load_existing_json()
     current_year = datetime.now().year
-    print(f"[*] Starting LADWP rate scrape for {current_year} (Target: {OUTPUT_FILE})...")
+    print(f"[*] Starting LADWP rate scrape for {current_year}...")
 
     session = requests.Session()
     session.headers.update(HEADERS)
@@ -304,14 +296,19 @@ def main():
     # Print Full Audit Table
     print_comparison_report(change_records, dry_run)
 
-    if has_updates and not dry_run:
-        data["lastUpdated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-        data["version"] = data.get("version", 1) + 1
-        os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
-        with open(OUTPUT_FILE, 'w') as f:
-            json.dump(data, f, indent=2)
-        print(f"[SUCCESS] Committed updated rate tables to {OUTPUT_FILE}")
-    elif not has_updates:
+    # WRITE TO BOTH DESTINATIONS IF UPDATED
+    if (has_updates or not dry_run):
+        today_stamp = datetime.now().strftime("%Y-%m-%d")
+        data["lastUpdated"] = today_stamp
+        if has_updates:
+            data["version"] = data.get("version", 1) + 1
+
+        for target_path in TARGET_FILES:
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            with open(target_path, 'w') as f:
+                json.dump(data, f, indent=2)
+            print(f"[SUCCESS] Written updated rate table to: {target_path}")
+    else:
         print("[INFO] No changes detected. All online tables match current cache.")
 
 
